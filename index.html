@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LaadWacht" />
+  <meta name="theme-color" content="#0f1923" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>LaadWacht</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1923;
+      --surface:   #1a2535;
+      --border:    #243045;
+      --accent:    #00d4aa;
+      --accent2:   #0099ff;
+      --warn:      #ff6b35;
+      --text:      #e8edf5;
+      --muted:     #6b7a95;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --radius:    12px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+    /* HEADER */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: 60px;
+      background: rgba(15,25,35,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+    }
+    .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; flex: 1; }
+    header h1 span { color: var(--accent); }
+    #notif-count {
+      background: var(--accent); color: var(--bg);
+      border-radius: 20px; font-size: 11px; font-weight: 700;
+      padding: 2px 8px; display: none;
+    }
+
+    /* MAP */
+    #map {
+      position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+      z-index: 1;
+    }
+
+    /* BOTTOM PANEL */
+    #panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      z-index: 500;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 0 16px 32px;
+      transform: translateY(calc(100% - 64px));
+      transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #panel.open { transform: translateY(0); }
+
+    .panel-handle {
+      display: flex; align-items: center; justify-content: center;
+      padding: 12px 0 8px; cursor: pointer; gap: 8px;
+    }
+    .handle-bar {
+      width: 36px; height: 4px;
+      background: var(--border); border-radius: 2px;
+    }
+    .panel-title {
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+
+    /* SEARCH */
+    .search-wrap { position: relative; margin-bottom: 16px; }
+    #search {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      padding: 12px 40px 12px 14px; font-size: 15px;
+      outline: none; transition: border-color 0.2s;
+    }
+    #search:focus { border-color: var(--accent); }
+    #search::placeholder { color: var(--muted); }
+    .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; }
+
+    /* STATION LIST */
+    #station-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .station-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+      cursor: pointer; transition: border-color 0.2s, transform 0.15s;
+    }
+    .station-card:active { transform: scale(0.98); }
+    .station-card.selected { border-color: var(--accent); }
+    .station-card.watched { border-color: var(--accent2); }
+
+    .station-top { display: flex; align-items: flex-start; gap: 10px; }
+    .station-icon {
+      width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .station-icon.available { background: rgba(34,197,94,0.15); }
+    .station-icon.busy      { background: rgba(239,68,68,0.15); }
+    .station-icon.unknown   { background: rgba(107,122,149,0.15); }
+
+    .station-info { flex: 1; min-width: 0; }
+    .station-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .station-addr { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .station-badges { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .badge {
+      font-size: 11px; font-weight: 600; border-radius: 6px;
+      padding: 3px 8px; text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .badge-green  { background: rgba(34,197,94,0.15);  color: var(--green); }
+    .badge-red    { background: rgba(239,68,68,0.15);  color: var(--red); }
+    .badge-grey   { background: rgba(107,122,149,0.15); color: var(--muted); }
+    .badge-blue   { background: rgba(0,153,255,0.15);  color: var(--accent2); }
+
+    .btn-watch {
+      margin-top: 12px; width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: var(--radius);
+      color: var(--bg); font-size: 14px; font-weight: 700;
+      padding: 12px; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-watch:active { opacity: 0.8; }
+    .btn-watch.watching {
+      background: rgba(0,212,170,0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    /* WATCHING LIST */
+    #watching-section { margin-top: 20px; }
+    .section-label {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    #watching-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .watch-item {
+      background: rgba(0,153,255,0.08); border: 1px solid rgba(0,153,255,0.25);
+      border-radius: var(--radius); padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .watch-pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent2); flex-shrink: 0;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.4; transform: scale(0.8); }
+    }
+    .watch-name { flex: 1; font-size: 13px; font-weight: 600; }
+    .watch-status { font-size: 11px; color: var(--muted); }
+    .btn-unwatch {
+      background: none; border: none; color: var(--muted);
+      font-size: 18px; cursor: pointer; padding: 2px 4px;
+      line-height: 1;
+    }
+
+    /* EMPTY STATE */
+    .empty {
+      text-align: center; padding: 32px 16px; color: var(--muted);
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-text { font-size: 14px; line-height: 1.5; }
+
+    /* TOAST */
+    #toast {
+      position: fixed; top: 72px; left: 16px; right: 16px;
+      z-index: 2000;
+      background: var(--surface); border: 1px solid var(--accent);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      transform: translateY(-80px); opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    .toast-icon { font-size: 20px; flex-shrink: 0; }
+    .toast-text { flex: 1; font-size: 13px; line-height: 1.4; }
+    .toast-title { font-weight: 700; margin-bottom: 2px; }
+
+    /* INSTALL BANNER */
+    #install-banner {
+      position: fixed; bottom: 72px; left: 16px; right: 16px;
+      z-index: 600;
+      background: var(--surface); border: 1px solid var(--accent2);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: none; gap: 12px; align-items: center;
+    }
+    #install-banner.show { display: flex; }
+    .install-text { flex: 1; font-size: 13px; line-height: 1.4; }
+    .install-text strong { color: var(--accent2); }
+    .btn-install {
+      background: var(--accent2); border: none; border-radius: 8px;
+      color: white; font-size: 12px; font-weight: 700;
+      padding: 8px 12px; cursor: pointer; white-space: nowrap;
+    }
+    .btn-dismiss { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+
+    /* LEAFLET OVERRIDES */
+    .leaflet-container { background: #0d1720; }
+    .leaflet-tile { filter: brightness(0.85) saturate(0.7); }
+
+    /* custom markers */
+    .ev-marker {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; border: 2px solid rgba(255,255,255,0.2);
+      cursor: pointer;
+    }
+    .ev-marker.available { background: rgba(34,197,94,0.9); }
+    .ev-marker.busy      { background: rgba(239,68,68,0.9); }
+    .ev-marker.unknown   { background: rgba(107,122,149,0.9); }
+    .ev-marker.watching  { border-color: var(--accent2); box-shadow: 0 0 12px var(--accent2); }
+
+    /* Loading overlay */
+    #loading {
+      position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+      z-index: 900; background: rgba(15,25,35,0.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px;
+    }
+    .spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { font-size: 14px; color: var(--muted); }
+
+    @media (min-width: 600px) {
+      #panel { max-width: 400px; right: auto; border-radius: 0; border-right: 1px solid var(--border); top: 60px; bottom: 0; transform: none; max-height: none; overflow-y: auto; }
+      #panel.open { transform: none; }
+      .panel-handle { display: none; }
+      #map { left: 400px; top: 60px; bottom: 0; }
+      #install-banner { bottom: 16px; left: 416px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <h1>Laad<span>Wacht</span></h1>
+  <span id="notif-count">0</span>
+</header>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Laadpalen laden…</p>
+</div>
+
+<div id="map"></div>
+
+<div id="panel">
+  <div class="panel-handle" id="panel-toggle">
+    <div class="handle-bar"></div>
+    <span class="panel-title" id="panel-label">Laadpalen</span>
+  </div>
+
+  <div class="search-wrap">
+    <input type="search" id="search" placeholder="Zoek op plaatsnaam of adres…" autocomplete="off" />
+    <span class="search-icon">🔍</span>
+  </div>
+
+  <div id="station-list">
+    <div class="empty">
+      <div class="empty-icon">🗺️</div>
+      <div class="empty-text">Tik op de kaart of zoek een locatie<br>om laadpalen te zien</div>
+    </div>
+  </div>
+
+  <div id="watching-section" style="display:none">
+    <div class="section-label">Wordt bewaakt</div>
+    <div id="watching-list"></div>
+  </div>
+</div>
+
+<div id="toast">
+  <div class="toast-icon">⚡</div>
+  <div class="toast-text">
+    <div class="toast-title" id="toast-title"></div>
+    <div id="toast-body"></div>
+  </div>
+</div>
+
+<div id="install-banner">
+  <div class="install-text">
+    <strong>📲 Voeg toe aan beginscherm</strong><br>
+    voor meldingen als een paal vrijkomt
+  </div>
+  <button class="btn-install" id="btn-install">Installeer</button>
+  <button class="btn-dismiss" id="btn-dismiss">×</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+// Uses Open Charge Map (free, no key needed for basic use)
+const OCM_KEY = 'YOUR_OCM_KEY'; // optional, works without for low volume
+const POLL_INTERVAL = 30000; // 30 seconds
+const MAX_RESULTS   = 20;
+
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let map, currentMarkers = {}, watchedStations = {}, pollTimers = {};
+let panelOpen = false;
+let notifPermission = Notification?.permission || 'default';
+let deferredInstall = null;
+
+// ─── MAP INIT ───────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', {
+    center: [50.85, 4.35], // België
+    zoom: 10,
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  L.control.zoom({ position: 'topright' }).addTo(map);
+  L.control.attribution({ position: 'bottomright', prefix: '© OpenStreetMap · OCM' }).addTo(map);
+
+  map.on('click', onMapClick);
+  map.on('moveend', () => {
+    if (map.getZoom() >= 12) loadStations(map.getCenter());
+  });
+
+  // Start at user location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const ll = [pos.coords.latitude, pos.coords.longitude];
+      map.setView(ll, 13);
+      loadStations({ lat: ll[0], lng: ll[1] });
+    }, () => loadStations(map.getCenter()));
+  } else {
+    loadStations(map.getCenter());
+  }
+}
+
+// ─── LOAD STATIONS ──────────────────────────────────────────────────────────
+async function loadStations(center) {
+  document.getElementById('loading').style.display = 'flex';
+  try {
+    const zoom   = map.getZoom();
+    const radius = zoom >= 14 ? 2 : zoom >= 12 ? 5 : 15;
+    const url    = `https://api.openchargemap.io/v3/poi/?output=json`
+                 + `&latitude=${center.lat}&longitude=${center.lng}`
+                 + `&distance=${radius}&distanceunit=km`
+                 + `&maxresults=${MAX_RESULTS}`
+                 + `&compact=true&verbose=false`
+                 + (OCM_KEY !== 'YOUR_OCM_KEY' ? `&key=${OCM_KEY}` : '');
+
+    const res  = await fetch(url);
+    const data = await res.json();
+    renderStations(data);
+  } catch(e) {
+    showToast('⚠️', 'Verbindingsfout', 'Kan laadpalen niet laden. Probeer opnieuw.');
+  }
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ─── RENDER STATIONS ────────────────────────────────────────────────────────
+function renderStations(stations) {
+  // Clear old markers (not watched)
+  Object.entries(currentMarkers).forEach(([id, m]) => {
+    if (!watchedStations[id]) {
+      map.removeLayer(m);
+      delete currentMarkers[id];
+    }
+  });
+
+  const list = document.getElementById('station-list');
+  list.innerHTML = '';
+
+  if (!stations.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">🔌</div><div class="empty-text">Geen laadpalen gevonden in dit gebied.<br>Zoom uit of beweeg de kaart.</div></div>`;
+    return;
+  }
+
+  stations.forEach(s => {
+    const id       = String(s.ID);
+    const name     = s.AddressInfo?.Title || 'Laadpaal';
+    const addr     = [s.AddressInfo?.AddressLine1, s.AddressInfo?.Town].filter(Boolean).join(', ');
+    const lat      = s.AddressInfo?.Latitude;
+    const lng      = s.AddressInfo?.Longitude;
+    const status   = getStatus(s);
+    const watched  = !!watchedStations[id];
+    const conns    = s.Connections || [];
+    const maxKw    = Math.max(0, ...conns.map(c => c.PowerKW || 0));
+
+    // MAP MARKER
+    if (!currentMarkers[id]) {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="ev-marker ${status} ${watched ? 'watching' : ''}" data-id="${id}">⚡</div>`,
+        iconSize: [32,32], iconAnchor: [16,16],
+      });
+      const marker = L.marker([lat, lng], { icon })
+        .addTo(map)
+        .on('click', () => selectStation(id, stations));
+      currentMarkers[id] = marker;
+    }
+
+    // LIST CARD
+    const card = document.createElement('div');
+    card.className = `station-card ${watched ? 'watched' : ''}`;
+    card.dataset.id = id;
+    card.innerHTML = `
+      <div class="station-top">
+        <div class="station-icon ${status}">${status === 'available' ? '✅' : status === 'busy' ? '🔴' : '❓'}</div>
+        <div class="station-info">
+          <div class="station-name">${name}</div>
+          <div class="station-addr">${addr || 'Adres onbekend'}</div>
+        </div>
+      </div>
+      <div class="station-badges">
+        <span class="badge ${status === 'available' ? 'badge-green' : status === 'busy' ? 'badge-red' : 'badge-grey'}">
+          ${status === 'available' ? 'Vrij' : status === 'busy' ? 'Bezet' : 'Onbekend'}
+        </span>
+        ${maxKw > 0 ? `<span class="badge badge-blue">${maxKw} kW</span>` : ''}
+        ${conns.length ? `<span class="badge badge-grey">${conns.length} aansluiting${conns.length > 1 ? 'en' : ''}</span>` : ''}
+      </div>
+      <button class="btn-watch ${watched ? 'watching' : ''}" data-id="${id}" data-name="${name}">
+        ${watched ? '🔔 Bewaking stoppen' : '🔔 Meld mij als vrij'}
+      </button>
+    `;
+    card.querySelector('.btn-watch').addEventListener('click', e => {
+      e.stopPropagation();
+      toggleWatch(id, name, status);
+    });
+    card.addEventListener('click', () => {
+      if (lat && lng) map.setView([lat, lng], 15, { animate: true });
+    });
+    list.appendChild(card);
+  });
+
+  openPanel();
+}
+
+// ─── STATUS ─────────────────────────────────────────────────────────────────
+function getStatus(s) {
+  const statusId = s.StatusType?.ID;
+  if (statusId === 50)  return 'available';
+  if (statusId === 210) return 'busy';
+  if (statusId === 100) return 'available';
+  // Check connections
+  const conns = s.Connections || [];
+  if (conns.some(c => c.StatusType?.ID === 50))  return 'available';
+  if (conns.some(c => c.StatusType?.ID === 210)) return 'busy';
+  return 'unknown';
+}
+
+// ─── SELECT STATION ─────────────────────────────────────────────────────────
+function selectStation(id, stations) {
+  document.querySelectorAll('.station-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.station-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.add('selected');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  openPanel();
+}
+
+// ─── WATCH / UNWATCH ────────────────────────────────────────────────────────
+async function toggleWatch(id, name, currentStatus) {
+  if (watchedStations[id]) {
+    unwatchStation(id);
+    return;
+  }
+
+  // Request notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    const perm = await Notification.requestPermission();
+    notifPermission = perm;
+  }
+
+  if (Notification?.permission !== 'granted') {
+    showToast('⚠️', 'Meldingen uitgeschakeld', 'Zet meldingen aan in je instellingen om een signaal te ontvangen.');
+    showInstallBanner();
+    return;
+  }
+
+  watchedStations[id] = { name, lastStatus: currentStatus, checkCount: 0 };
+  startPolling(id, name);
+  renderWatchList();
+  showToast('🔔', 'Bewaking gestart', `Je krijgt een melding zodra "${name}" vrijkomt.`);
+  updateNotifCount();
+
+  // Re-render card
+  document.querySelectorAll(`.station-card[data-id="${id}"] .btn-watch`).forEach(btn => {
+    btn.textContent = '🔔 Bewaking stoppen';
+    btn.classList.add('watching');
+  });
+  document.querySelectorAll(`.station-card[data-id="${id}"]`).forEach(c => c.classList.add('watched'));
+}
+
+function unwatchStation(id) {
+  clearInterval(pollTimers[id]);
+  delete pollTimers[id];
+  delete watchedStations[id];
+  renderWatchList();
+  updateNotifCount();
+  document.querySelectorAll(`.station-card[data-id="${id}"] .btn-watch`).forEach(btn => {
+    btn.textContent = '🔔 Meld mij als vrij';
+    btn.classList.remove('watching');
+  });
+  document.querySelectorAll(`.station-card[data-id="${id}"]`).forEach(c => c.classList.remove('watched'));
+  showToast('🔕', 'Bewaking gestopt', 'Je ontvangt geen meldingen meer voor deze paal.');
+}
+
+// ─── POLLING ────────────────────────────────────────────────────────────────
+function startPolling(id, name) {
+  // Poll immediately, then on interval
+  pollStation(id, name);
+  pollTimers[id] = setInterval(() => pollStation(id, name), POLL_INTERVAL);
+}
+
+async function pollStation(id, name) {
+  if (!watchedStations[id]) return;
+  try {
+    const url = `https://api.openchargemap.io/v3/poi/?output=json&chargepointid=${id}&compact=true&verbose=false`
+              + (OCM_KEY !== 'YOUR_OCM_KEY' ? `&key=${OCM_KEY}` : '');
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!data.length) return;
+
+    const newStatus = getStatus(data[0]);
+    const prev      = watchedStations[id]?.lastStatus;
+
+    watchedStations[id].checkCount++;
+    updateWatchItemStatus(id, newStatus);
+
+    if (prev !== 'available' && newStatus === 'available') {
+      // 🎉 VRIJ!
+      notifyAvailable(id, name);
+    }
+    watchedStations[id].lastStatus = newStatus;
+
+  } catch(e) {
+    console.warn('Poll error voor', id, e);
+  }
+}
+
+function notifyAvailable(id, name) {
+  // In-app toast
+  showToast('✅', 'Laadpaal vrij!', `"${name}" is nu beschikbaar!`);
+
+  // System notification
+  if (Notification?.permission === 'granted') {
+    new Notification('⚡ Laadpaal vrij!', {
+      body: `${name} is nu beschikbaar om te laden.`,
+      icon: 'icon-192.png',
+      badge: 'icon-192.png',
+      tag: `ev-${id}`,
+      renotify: true,
+    });
+  }
+
+  // Stop watching after notification
+  setTimeout(() => unwatchStation(id), 5000);
+}
+
+// ─── WATCH LIST UI ──────────────────────────────────────────────────────────
+function renderWatchList() {
+  const section = document.getElementById('watching-section');
+  const list    = document.getElementById('watching-list');
+  const entries = Object.entries(watchedStations);
+
+  if (!entries.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  list.innerHTML = entries.map(([id, s]) => `
+    <div class="watch-item" id="watch-item-${id}">
+      <div class="watch-pulse"></div>
+      <div style="flex:1">
+        <div class="watch-name">${s.name}</div>
+        <div class="watch-status" id="watch-status-${id}">Controleren… (${s.checkCount || 0}x)</div>
+      </div>
+      <button class="btn-unwatch" onclick="unwatchStation('${id}')">×</button>
+    </div>
+  `).join('');
+}
+
+function updateWatchItemStatus(id, status) {
+  const el = document.getElementById(`watch-status-${id}`);
+  if (el && watchedStations[id]) {
+    const s = watchedStations[id];
+    const statusText = status === 'available' ? '✅ Vrij!' : status === 'busy' ? '🔴 Bezet' : '❓ Onbekend';
+    el.textContent = `${statusText} · ${s.checkCount}x gecontroleerd`;
+  }
+}
+
+function updateNotifCount() {
+  const count = Object.keys(watchedStations).length;
+  const el    = document.getElementById('notif-count');
+  el.textContent = count;
+  el.style.display = count > 0 ? 'block' : 'none';
+}
+
+// ─── SEARCH ─────────────────────────────────────────────────────────────────
+let searchTimer;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 3) return;
+  searchTimer = setTimeout(() => geocodeAndLoad(q), 500);
+});
+
+async function geocodeAndLoad(q) {
+  try {
+    const res  = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+    const data = await res.json();
+    if (data.length) {
+      const { lat, lon } = data[0];
+      map.setView([lat, lon], 13, { animate: true });
+      loadStations({ lat: parseFloat(lat), lng: parseFloat(lon) });
+    }
+  } catch(e) { console.warn('Geocode error', e); }
+}
+
+// ─── MAP CLICK ──────────────────────────────────────────────────────────────
+function onMapClick(e) {
+  loadStations(e.latlng);
+}
+
+// ─── PANEL ──────────────────────────────────────────────────────────────────
+function openPanel() {
+  if (window.innerWidth < 600) {
+    panelOpen = true;
+    document.getElementById('panel').classList.add('open');
+    document.getElementById('panel-label').textContent = 'Laadpalen';
+  }
+}
+
+document.getElementById('panel-toggle').addEventListener('click', () => {
+  panelOpen = !panelOpen;
+  document.getElementById('panel').classList.toggle('open', panelOpen);
+});
+
+// ─── TOAST ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(icon, title, body) {
+  document.querySelector('.toast-icon').textContent = icon;
+  document.getElementById('toast-title').textContent = title;
+  document.getElementById('toast-body').textContent = body;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ─── INSTALL BANNER ─────────────────────────────────────────────────────────
+function showInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  banner.classList.add('show');
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  setTimeout(showInstallBanner, 3000);
+});
+
+document.getElementById('btn-install').addEventListener('click', async () => {
+  if (deferredInstall) {
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    deferredInstall = null;
+  } else {
+    // iOS instruction
+    showToast('📲', 'Voeg toe aan beginscherm', 'Tik op het Deel-icoon (□↑) en kies "Zet op beginscherm"');
+  }
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+document.getElementById('btn-dismiss').addEventListener('click', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+// Detect iOS for manual install instructions
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.navigator.standalone;
+if (isIOS && !isStandalone) {
+  setTimeout(showInstallBanner, 4000);
+}
+
+// ─── SERVICE WORKER ─────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW error', e));
+}
+
+// ─── BOOT ───────────────────────────────────────────────────────────────────
+initMap();
+</script>
+</body>
+</html>
