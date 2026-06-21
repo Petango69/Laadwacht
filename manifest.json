@@ -23,7 +23,15 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "name",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "shortcuts": [
     {
       "name": "Bewaking bekijken",

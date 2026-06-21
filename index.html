@@ -11,6 +11,8 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <title>LaadWacht</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -49,6 +51,21 @@
     }
     header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; flex: 1; }
     header h1 span { color: var(--accent); }
+
+    #svc-bar { display: flex; gap: 10px; align-items: center; }
+    .svc {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      white-space: nowrap;
+    }
+    .svc-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--muted);
+    }
+    .svc-dot.ok       { background: var(--green); }
+    .svc-dot.error    { background: var(--red); }
+    .svc-dot.checking { background: var(--accent); animation: pulse 1s infinite; }
+
     #notif-count {
       background: var(--accent); color: var(--bg);
       border-radius: 20px; font-size: 11px; font-weight: 700;
@@ -102,6 +119,55 @@
     .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; }
 
     /* STATION LIST */
+    #kw-filter {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      padding: 0 0 12px;
+    }
+    .kw-chip {
+      font-size: 12px; font-weight: 600;
+      padding: 5px 11px; border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg); color: var(--muted);
+      cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .kw-chip.active {
+      background: var(--accent); color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    #nearest-section {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--bg); margin-bottom: 12px; overflow: hidden;
+    }
+    #nearest-toggle {
+      padding: 10px 14px; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; font-weight: 700; color: var(--muted);
+      user-select: none;
+    }
+    #nearest-toggle:active { opacity: 0.7; }
+    #nearest-body { padding: 0 14px 14px; border-top: 1px solid var(--border); }
+    .filter-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .filter-label { font-size: 11px; font-weight: 700; color: var(--muted); min-width: 58px; }
+    .filter-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+    .nf-chip {
+      font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 14px;
+      border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+      cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .nf-chip.active { background: rgba(0,212,170,0.15); color: var(--accent); border-color: var(--accent); }
+    #btn-find-nearest {
+      margin-top: 12px; width: 100%; padding: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: var(--radius);
+      color: var(--bg); font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    #btn-find-nearest:active { opacity: 0.8; }
+
     #station-list { display: flex; flex-direction: column; gap: 10px; }
 
     .station-card {
@@ -117,10 +183,10 @@
     .station-icon {
       width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; font-size: 16px;
+      background: rgba(107,122,149,0.15);
     }
     .station-icon.available { background: rgba(34,197,94,0.15); }
     .station-icon.busy      { background: rgba(239,68,68,0.15); }
-    .station-icon.unknown   { background: rgba(107,122,149,0.15); }
 
     .station-info { flex: 1; min-width: 0; }
     .station-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -135,19 +201,49 @@
     .badge-red    { background: rgba(239,68,68,0.15);  color: var(--red); }
     .badge-grey   { background: rgba(107,122,149,0.15); color: var(--muted); }
     .badge-blue   { background: rgba(0,153,255,0.15);  color: var(--accent2); }
+    .badge-teal   { background: rgba(0,212,170,0.15);  color: var(--accent); }
+    .badge-orange { background: rgba(255,107,53,0.15); color: var(--warn); }
+
+    /* CONNECTOR DETAIL LIJST */
+    .conn-detail { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .conn-row {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      background: var(--bg); border-radius: 8px; padding: 6px 10px;
+    }
+    .conn-type { font-size: 12px; font-weight: 700; color: var(--text); flex: 1; min-width: 70px; }
+    .conn-kw   { font-size: 11px; font-weight: 600; color: var(--accent2); }
+    .conn-avail { font-size: 11px; font-weight: 700; margin-left: auto; }
+    .conn-avail.free { color: var(--green); }
+    .conn-avail.busy { color: var(--red); }
+    .conn-avail.unknown { color: var(--muted); }
+
+    .btn-nav {
+      width: 34px; height: 34px; flex-shrink: 0;
+      background: rgba(0,153,255,0.12);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--accent2); font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none; transition: background 0.2s;
+    }
+    .btn-nav:active { opacity: 0.7; }
+    .station-dist {
+      font-size: 11px; font-weight: 600; color: var(--accent2); margin-left: 6px;
+    }
 
     .btn-watch {
-      margin-top: 12px; width: 100%;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border: none; border-radius: var(--radius);
-      color: var(--bg); font-size: 14px; font-weight: 700;
-      padding: 12px; cursor: pointer; transition: opacity 0.2s;
+      width: 34px; height: 34px; flex-shrink: 0;
+      background: rgba(107,122,149,0.12);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--muted); font-size: 16px;
+      cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
     }
-    .btn-watch:active { opacity: 0.8; }
+    .btn-watch:active { opacity: 0.7; }
     .btn-watch.watching {
       background: rgba(0,212,170,0.15);
       color: var(--accent);
-      border: 1px solid var(--accent);
+      border-color: var(--accent);
     }
 
     /* WATCHING LIST */
@@ -223,36 +319,56 @@
     .btn-dismiss { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
 
     /* LEAFLET OVERRIDES */
-    .leaflet-container { background: #0d1720; }
-    .leaflet-tile { filter: brightness(0.85) saturate(0.7); }
+    .leaflet-container { background: #e8e0d8; }
 
-    /* custom markers */
+    /* EV MARKERS */
     .ev-marker {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 28px; height: 28px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; border: 2px solid rgba(255,255,255,0.2);
-      cursor: pointer;
+      font-size: 13px; border: 2px solid rgba(255,255,255,0.25);
+      cursor: pointer; background: rgba(107,122,149,0.85);
     }
-    .ev-marker.available { background: rgba(34,197,94,0.9); }
-    .ev-marker.busy      { background: rgba(239,68,68,0.9); }
-    .ev-marker.unknown   { background: rgba(107,122,149,0.9); }
-    .ev-marker.watching  { border-color: var(--accent2); box-shadow: 0 0 12px var(--accent2); }
+    .ev-marker.available { background: rgba(34,197,94,0.92); }
+    .ev-marker.busy      { background: rgba(239,68,68,0.92); }
+    .ev-marker.unknown   { background: rgba(107,122,149,0.85); }
+    .ev-marker.live      { animation: livering 2.5s ease-out infinite; }
+    .ev-marker.available.live { --ring: rgba(34,197,94,0.6); }
+    .ev-marker.busy.live      { --ring: rgba(239,68,68,0.6); }
+    .ev-marker.unknown.live   { --ring: rgba(0,153,255,0.5); }
+    @keyframes livering {
+      0%   { box-shadow: 0 0 0 0 var(--ring, rgba(0,153,255,0.5)); }
+      70%  { box-shadow: 0 0 0 8px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    .ev-marker.watching { border-color: var(--accent2); box-shadow: 0 0 12px var(--accent2); }
+
+    /* CLUSTER MARKERS */
+    .ev-cluster { background: transparent !important; border: none !important; }
+    .cluster-icon {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--accent);
+      color: var(--bg); font-weight: 700; font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid rgba(255,255,255,0.25);
+      box-shadow: 0 0 10px rgba(0,212,170,0.5);
+    }
+    .cluster-icon.large { width: 46px; height: 46px; font-size: 15px; background: var(--accent2); }
 
     /* Loading overlay */
     #loading {
-      position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
-      z-index: 900; background: rgba(15,25,35,0.85);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 16px;
+      position: fixed; top: 60px; left: 0; right: 0;
+      height: 3px; z-index: 900;
+      background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+      background-size: 200% 100%;
+      animation: loadslide 1.4s linear infinite;
+      display: none;
+      pointer-events: none;
     }
-    .spinner {
-      width: 40px; height: 40px; border-radius: 50%;
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      animation: spin 0.8s linear infinite;
+    @keyframes loadslide {
+      0%   { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading p { font-size: 14px; color: var(--muted); }
 
     @media (min-width: 600px) {
       #panel { max-width: 400px; right: auto; border-radius: 0; border-right: 1px solid var(--border); top: 60px; bottom: 0; transform: none; max-height: none; overflow-y: auto; }
@@ -268,13 +384,14 @@
 <header>
   <div class="logo">⚡</div>
   <h1>Laad<span>Wacht</span></h1>
+  <div id="svc-bar">
+    <div class="svc" title="OpenStreetMap / Overpass"><div id="dot-osm" class="svc-dot"></div><span>OSM</span></div>
+    <div class="svc" title="TomTom live status"><div id="dot-tt" class="svc-dot"></div><span>TomTom</span></div>
+  </div>
   <span id="notif-count">0</span>
 </header>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <p>Laadpalen laden…</p>
-</div>
+<div id="loading"></div>
 
 <div id="map"></div>
 
@@ -284,16 +401,72 @@
     <span class="panel-title" id="panel-label">Laadpalen</span>
   </div>
 
+  <div id="status-bar" style="display:none; justify-content:center; gap:16px; padding:8px 0 12px; font-size:13px; font-weight:600;">
+    <span id="sb-free"></span>
+    <span id="sb-busy"></span>
+    <span id="sb-unknown"></span>
+  </div>
+
   <div class="search-wrap">
-    <input type="search" id="search" placeholder="Zoek op plaatsnaam of adres…" autocomplete="off" />
+    <input type="search" id="search" placeholder="Zoek stad, adres of plak coördinaten…" autocomplete="off" />
     <span class="search-icon">🔍</span>
+  </div>
+  <div id="share-hint" style="font-size:11px;color:var(--muted);margin:-8px 0 14px;line-height:1.5;display:none">
+    💡 Tip: plak coördinaten (<code style="color:var(--accent)">51.05, 4.37</code>) of een Google/Apple Maps link om direct naar een paal te springen.
+  </div>
+
+  <div id="kw-filter">
+    <span class="kw-chip active" data-min="0"   data-max="9999">Alles</span>
+    <span class="kw-chip"        data-min="0"   data-max="22">≤ 22 kW (AC)</span>
+    <span class="kw-chip"        data-min="22"  data-max="99">22–99 kW</span>
+    <span class="kw-chip"        data-min="100" data-max="9999">≥ 100 kW</span>
+  </div>
+
+  <div id="nearest-section">
+    <div id="nearest-toggle">🎯 Dichtstbijzijnde zoeken <span id="nearest-arrow">▼</span></div>
+    <div id="nearest-body" style="display:none">
+      <div class="filter-row">
+        <span class="filter-label">Status</span>
+        <div class="filter-chips">
+          <span class="nf-chip active" data-key="status" data-val="">Alle</span>
+          <span class="nf-chip"        data-key="status" data-val="available">Vrij</span>
+          <span class="nf-chip"        data-key="status" data-val="busy">Bezet</span>
+        </div>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Vermogen</span>
+        <div class="filter-chips">
+          <span class="nf-chip active" data-key="minKw" data-val="0">Alle</span>
+          <span class="nf-chip"        data-key="minKw" data-val="50">≥ 50 kW</span>
+          <span class="nf-chip"        data-key="minKw" data-val="100">≥ 100 kW</span>
+          <span class="nf-chip"        data-key="minKw" data-val="150">≥ 150 kW</span>
+        </div>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Type</span>
+        <div class="filter-chips">
+          <span class="nf-chip active" data-key="connType" data-val="">Alle</span>
+          <span class="nf-chip"        data-key="connType" data-val="CCS">CCS</span>
+          <span class="nf-chip"        data-key="connType" data-val="Type 2">Type 2</span>
+          <span class="nf-chip"        data-key="connType" data-val="CHAdeMO">CHAdeMO</span>
+          <span class="nf-chip"        data-key="connType" data-val="Tesla SC">Tesla</span>
+        </div>
+      </div>
+      <button id="btn-find-nearest">🎯 Zoek dichtstbijzijnde</button>
+    </div>
   </div>
 
   <div id="station-list">
     <div class="empty">
       <div class="empty-icon">🗺️</div>
-      <div class="empty-text">Tik op de kaart of zoek een locatie<br>om laadpalen te zien</div>
+      <div class="empty-text">Zoom in op een stad om<br>laadpalen te zien</div>
     </div>
+  </div>
+
+  <div id="legend" style="display:none; margin-top:16px; padding:10px 12px; background:var(--bg); border-radius:var(--radius); border:1px solid var(--border); font-size:11px; color:var(--muted); line-height:1.8">
+    <div style="font-weight:700; color:var(--text); margin-bottom:4px">Legenda</div>
+    <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(34,197,94,0.9);vertical-align:middle;margin-right:6px"></span>Vrij · <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(239,68,68,0.9);vertical-align:middle;margin-right:6px"></span>Bezet · <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(107,122,149,0.85);vertical-align:middle;margin-right:6px"></span>Onbekend</div>
+    <div style="margin-top:4px">Pulserende ring = live data beschikbaar · <strong>1/2</strong> = vrij/totaal</div>
   </div>
 
   <div id="watching-section" style="display:none">
@@ -320,207 +493,618 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-// Uses Open Charge Map (free, no key needed for basic use)
-const OCM_KEY = 'YOUR_OCM_KEY'; // optional, works without for low volume
-const POLL_INTERVAL = 30000; // 30 seconds
-const MAX_RESULTS   = 20;
+const TOMTOM_KEY    = 'WjQSVr0B6ncMxv8tZDYpZRZ7NO56z9pB';
+const OCM_KEY       = 'YOUR_OCM_KEY';    // fallback als TomTom niet ingesteld is
+const POLL_INTERVAL = 30000;
+const MIN_ZOOM      = 11;
+const MAX_RESULTS   = 500;
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
 
 // ─── STATE ──────────────────────────────────────────────────────────────────
-let map, currentMarkers = {}, watchedStations = {}, pollTimers = {};
-let panelOpen = false;
-let notifPermission = Notification?.permission || 'default';
-let deferredInstall = null;
+let map, clusterGroup;
+let currentStations  = {};
+let watchedStations  = {};
+let pollTimers       = {};
+let panelOpen        = false;
+let loadTimer        = null;
+let deferredInstall  = null;
+let pendingAutoWatch = null;
+let lastLoadedBounds = null;
+let lastZoom         = null;
+let lastOSMElements  = []; // cache voor achtergrond status-update
+let lastStatusIndex  = []; // cache voor kW-filter herrender
+let userPos          = null; // { lat, lng } — bijgehouden via watchPosition
+let kwFilter         = null; // null=alles | [min,max] kW range
+
+// ─── LOCATIE & AFSTAND ───────────────────────────────────────────────────────
+function distanceMeter(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function formatDist(m) {
+  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+}
+function navUrl(lat, lng) {
+  return `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+}
+
+// ─── SERVICE STATUS ──────────────────────────────────────────────────────────
+function setSvcStatus(id, state) { // state: 'ok' | 'error' | 'checking' | ''
+  const el = document.getElementById('dot-' + id);
+  if (!el) return;
+  el.className = 'svc-dot ' + state;
+}
 
 // ─── MAP INIT ───────────────────────────────────────────────────────────────
 function initMap() {
   map = L.map('map', {
-    center: [50.85, 4.35], // België
-    zoom: 10,
+    center: [51.0, 10.0],
+    zoom: 5,
     zoomControl: false,
     attributionControl: false,
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
   }).addTo(map);
 
+  clusterGroup = L.markerClusterGroup({
+    maxClusterRadius: 60,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    iconCreateFunction(cluster) {
+      const n    = cluster.getChildCount();
+      const size = n > 100 ? 'large' : '';
+      return L.divIcon({
+        html: `<div class="cluster-icon ${size}">${n}</div>`,
+        className: 'ev-cluster',
+        iconSize: [n > 100 ? 46 : 38, n > 100 ? 46 : 38],
+      });
+    },
+  });
+  map.addLayer(clusterGroup);
+
   L.control.zoom({ position: 'topright' }).addTo(map);
-  L.control.attribution({ position: 'bottomright', prefix: '© OpenStreetMap · OCM' }).addTo(map);
+  L.control.attribution({
+    position: 'bottomright',
+    prefix: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · Overpass API',
+  }).addTo(map);
 
-  map.on('click', onMapClick);
-  map.on('moveend', () => {
-    if (map.getZoom() >= 12) loadStations(map.getCenter());
+  map.on('moveend', scheduleLoad);
+  map.on('zoomend', () => {
+    // Alleen herladen bij uitzoomen — inzoomen heeft de data al
+    if (map.getZoom() < (lastZoom || 99)) lastLoadedBounds = null;
+    lastZoom = map.getZoom();
   });
 
-  // Start at user location
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const ll = [pos.coords.latitude, pos.coords.longitude];
-      map.setView(ll, 13);
-      loadStations({ lat: ll[0], lng: ll[1] });
-    }, () => loadStations(map.getCenter()));
+    let posSet = false;
+    navigator.geolocation.watchPosition(
+      pos => {
+        userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        if (!posSet) { posSet = true; map.setView([userPos.lat, userPos.lng], 13); }
+      },
+      () => { if (!posSet) { posSet = true; map.setView([50.85, 4.35], 13); } },
+      { enableHighAccuracy: false, maximumAge: 30000 }
+    );
   } else {
-    loadStations(map.getCenter());
+    map.setView([50.85, 4.35], 13);
   }
 }
 
-// ─── LOAD STATIONS ──────────────────────────────────────────────────────────
-async function loadStations(center) {
-  document.getElementById('loading').style.display = 'flex';
-  try {
-    const zoom   = map.getZoom();
-    const radius = zoom >= 14 ? 2 : zoom >= 12 ? 5 : 15;
-    const url    = `https://api.openchargemap.io/v3/poi/?output=json`
-                 + `&latitude=${center.lat}&longitude=${center.lng}`
-                 + `&distance=${radius}&distanceunit=km`
-                 + `&maxresults=${MAX_RESULTS}`
-                 + `&compact=true&verbose=false`
-                 + (OCM_KEY !== 'YOUR_OCM_KEY' ? `&key=${OCM_KEY}` : '');
-
-    const res  = await fetch(url);
-    const data = await res.json();
-    renderStations(data);
-  } catch(e) {
-    showToast('⚠️', 'Verbindingsfout', 'Kan laadpalen niet laden. Probeer opnieuw.');
+// ─── LOAD SCHEDULING ────────────────────────────────────────────────────────
+function scheduleLoad() {
+  clearTimeout(loadTimer);
+  if (map.getZoom() < MIN_ZOOM) {
+    lastLoadedBounds = null;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('station-list').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">Zoom in op een stad (niveau ${MIN_ZOOM}+)<br>om laadpalen te zien.</div>
+      </div>`;
+    return;
   }
-  document.getElementById('loading').style.display = 'none';
+  // Niet herladen als het zichtbare gebied (+ 10% marge) al geladen is
+  if (lastLoadedBounds && lastLoadedBounds.contains(map.getBounds().pad(0.1))) return;
+  loadTimer = setTimeout(loadStations, 800);
 }
 
-// ─── RENDER STATIONS ────────────────────────────────────────────────────────
-function renderStations(stations) {
-  // Clear old markers (not watched)
-  Object.entries(currentMarkers).forEach(([id, m]) => {
-    if (!watchedStations[id]) {
-      map.removeLayer(m);
-      delete currentMarkers[id];
+// Safari-compatibele timeout helper
+function fetchWithTimeout(url, options, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal })
+    .finally(() => clearTimeout(timer));
+}
+
+// ─── LOAD VIA OVERPASS (met mirror-fallback) ─────────────────────────────────
+async function overpassFetch(query) {
+  setSvcStatus('osm', 'checking');
+  for (const mirror of OVERPASS_MIRRORS) {
+    try {
+      const res = await fetchWithTimeout(mirror, { method: 'POST', body: query }, 25000);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSvcStatus('osm', 'ok');
+      return data;
+    } catch(e) {
+      console.warn(`Overpass mirror mislukt (${mirror}):`, e.message);
     }
-  });
+  }
+  setSvcStatus('osm', 'error');
+  throw new Error('Alle Overpass mirrors zijn onbereikbaar');
+}
 
+async function loadStations() {
+  document.getElementById('loading').style.display = 'block';
+  try {
+    const b    = map.getBounds();
+    const bbox = `${b.getSouth().toFixed(5)},${b.getWest().toFixed(5)},${b.getNorth().toFixed(5)},${b.getEast().toFixed(5)}`;
+    const q    = `[out:json][timeout:25][bbox:${bbox}];(node["amenity"="charging_station"];way["amenity"="charging_station"];);out center tags ${MAX_RESULTS};`;
+
+    // Fase 1: OSM laadpalen tonen zodra data binnen is
+    const osmResult = await overpassFetch(q);
+    lastLoadedBounds = b.pad(0.5);
+    lastOSMElements  = osmResult.elements || [];
+    renderStations(lastOSMElements, []);
+    document.getElementById('loading').style.display = 'none';
+
+    // Fase 2: TomTom update elke paal individueel zodra zijn data binnenkomt
+    if (TOMTOM_KEY !== 'YOUR_TOMTOM_KEY') {
+      fetchTomTomIndex(b); // fire-and-forget — applyLiveUpdate doet de updates
+    } else {
+      const statusIndex = await fetchOCMIndex(b);
+      if (statusIndex.length > 0) {
+        lastStatusIndex = statusIndex;
+        renderStations(lastOSMElements, statusIndex);
+      }
+    }
+
+  } catch(e) {
+    console.error(e);
+    showToast('⚠️', 'Verbindingsfout', 'Alle servers zijn momenteel bezet. Probeer opnieuw.');
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+// ─── TOMTOM STATUS INDEX ────────────────────────────────────────────────────
+async function fetchTomTomIndex(bounds) {
+  setSvcStatus('tt', 'checking');
+  try {
+    const c      = bounds.getCenter();
+    const dLat   = bounds.getNorth() - bounds.getSouth();
+    const dLng   = bounds.getEast()  - bounds.getWest();
+    const radius = Math.min(Math.round(Math.max(dLat, dLng) * 60000), 25000);
+
+    // Stap 1: zoek EV-laadstations in het gebied
+    const searchUrl = `https://api.tomtom.com/search/2/nearbySearch/.json`
+                    + `?key=${TOMTOM_KEY}&lat=${c.lat}&lon=${c.lng}`
+                    + `&radius=${radius}&categorySet=7309&limit=50&view=Unified`;
+    const searchRes = await fetchWithTimeout(searchUrl, {}, 10000);
+    if (!searchRes.ok) throw new Error(`TomTom search HTTP ${searchRes.status}`);
+    const results = (await searchRes.json()).results || [];
+
+    // Stap 2: haal live beschikbaarheid per station op — update kaart zodra elk klaar is
+    let liveCount = 0;
+    await Promise.all(
+      results
+        .filter(r => r.dataSources?.chargingAvailability?.id)
+        .slice(0, 30)
+        .map(async r => {
+          const avId = r.dataSources.chargingAvailability.id;
+          try {
+            const avUrl = `https://api.tomtom.com/search/2/chargingAvailability.json`
+                        + `?key=${TOMTOM_KEY}&chargingAvailability=${avId}`;
+            const avRes = await fetchWithTimeout(avUrl, {}, 8000);
+            if (!avRes.ok) return;
+            const avData      = await avRes.json();
+            const conns       = avData.connectors || [];
+            const free        = conns.reduce((s, c) => s + (c.availability?.current?.available || 0), 0);
+            const busy        = conns.reduce((s, c) => s + (c.availability?.current?.occupied  || 0), 0);
+            const total       = conns.reduce((s, c) => s + (c.total || 0), 0);
+            const connDetails = conns.map(c => ({
+              type:    ttConnLabel(c.type),
+              powerKW: c.availability?.perPowerLevel?.[0]?.powerKW || null,
+              free:    c.availability?.current?.available || 0,
+              total:   c.total || 0,
+            }));
+            liveCount++;
+            // Onmiddellijk de matching OSM-paal bijwerken — geen wachten op de rest
+            applyLiveUpdate({
+              lat: r.position?.lat, lng: r.position?.lon,
+              status: free > 0 ? 'available' : busy > 0 ? 'busy' : 'unknown',
+              free, busy, total, connDetails,
+            });
+          } catch { /* station overgeslagen */ }
+        })
+    );
+
+    setSvcStatus('tt', liveCount > 0 ? 'ok' : 'error');
+    return []; // applyLiveUpdate heeft al alles bijgewerkt
+  } catch(e) {
+    console.warn('TomTom fetch mislukt:', e.message);
+    setSvcStatus('tt', 'error');
+    return [];
+  }
+}
+
+// ─── OCM STATUS INDEX (fallback) ────────────────────────────────────────────
+async function fetchOCMIndex(bounds) {
+  try {
+    const c      = bounds.getCenter();
+    const dLat   = bounds.getNorth() - bounds.getSouth();
+    const dLng   = bounds.getEast()  - bounds.getWest();
+    const radius = Math.min(Math.max(dLat, dLng) * 60, 25).toFixed(1); // rough km, max 25
+    const key    = OCM_KEY !== 'YOUR_OCM_KEY' ? `&key=${OCM_KEY}` : '';
+    const url    = `https://api.openchargemap.io/v3/poi/?output=json&compact=true&verbose=false`
+                 + `&latitude=${c.lat}&longitude=${c.lng}&distance=${radius}&distanceunit=km&maxresults=300${key}`;
+    const res    = await fetchWithTimeout(url, {}, 10000);
+    const data   = await res.json();
+    return data.map(s => ({
+      lat:    s.AddressInfo?.Latitude,
+      lng:    s.AddressInfo?.Longitude,
+      status: getOCMStatus(s),
+      ocmId:  String(s.ID),
+    })).filter(s => s.lat && s.lng);
+  } catch(e) {
+    console.warn('OCM status fetch mislukt:', e.message);
+    return [];
+  }
+}
+
+// Find closest entry within ~80m
+function lookupStatus(lat, lng, ocmIndex) {
+  let best = null, bestD = Infinity;
+  for (const s of ocmIndex) {
+    const d = Math.hypot(s.lat - lat, s.lng - lng);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  if (!best || bestD > 0.0008) return { status: 'unknown', free: 0, busy: 0, total: 0, connDetails: [], ocmId: null };
+  return {
+    status:      best.status,
+    free:        best.free        || 0,
+    busy:        best.busy        || 0,
+    total:       best.total       || 0,
+    connDetails: best.connDetails || [],
+    ocmId:       best.ocmId       || null,
+  };
+}
+
+// ─── PARSE OSM ELEMENT ──────────────────────────────────────────────────────
+function parseStation(el, ocmIndex = []) {
+  const tags = el.tags || {};
+  const lat  = el.lat  ?? el.center?.lat;
+  const lng  = el.lon  ?? el.center?.lon;
+  if (!lat || !lng) return null;
+
+  const name = tags.name || tags.operator || tags.brand || 'Laadstation';
+  const addr = [tags['addr:street'], tags['addr:housenumber'], tags['addr:city']]
+    .filter(Boolean).join(' ');
+
+  // Connector types
+  const connTypes = [];
+  if (tags['socket:type2'])                                               connTypes.push('Type 2');
+  if (tags['socket:type2_combo'] || tags['socket:type2_css'])             connTypes.push('CCS');
+  if (tags['socket:chademo'])                                             connTypes.push('CHAdeMO');
+  if (tags['socket:tesla_supercharger'] || tags['socket:type2_tesla'])    connTypes.push('Tesla SC');
+  if (tags['socket:schuko'])                                              connTypes.push('Schuko');
+  if (tags['socket:nema_5_20'] || tags['socket:nema_14_50'])              connTypes.push('NEMA');
+
+  // Total socket count
+  const totalSockets = Object.keys(tags)
+    .filter(k => /^socket:[^:]+$/.test(k))
+    .reduce((sum, k) => sum + (parseInt(tags[k]) || 1), 0);
+
+  // Max power in kW
+  const powerRaw = [
+    tags.maxpower,
+    tags['socket:type2_combo:output'],
+    tags['socket:chademo:output'],
+    tags['socket:type2:output'],
+    tags['socket:tesla_supercharger:output'],
+  ].map(v => parseFloat(v)).filter(n => !isNaN(n));
+  const maxKw = powerRaw.length ? Math.max(...powerRaw) : 0;
+
+  // Zoek live status op in de index (dichtstbijzijnde station binnen ~80m)
+  const ref = tags['ref:ocm']
+    ? { status: 'unknown', free: 0, busy: 0, total: 0, ocmId: tags['ref:ocm'] }
+    : lookupStatus(lat, lng, ocmIndex);
+
+  // Betaalmethode / authenticatie
+  const auth = [];
+  if (tags['authentication:app']            === 'yes') auth.push('App');
+  if (tags['authentication:membership_card'] === 'yes' ||
+      tags['authentication:nfc']            === 'yes') auth.push('RFID');
+  if (tags['authentication:contactless']    === 'yes') auth.push('Contactloos');
+  if (tags['authentication:none']           === 'yes') auth.push('Geen login');
+
+  return {
+    id:           String(el.id),
+    lat, lng,
+    name,
+    addr:         addr || tags.operator || '',
+    operator:     tags.operator || tags.brand || null,
+    connTypes,
+    totalSockets,
+    maxKw,
+    fee:          tags.fee,
+    openingHours: tags['opening_hours'],
+    auth,
+    status:      ref.status,
+    free:        ref.free,
+    busy:        ref.busy,
+    liveTotal:   ref.total,
+    connDetails: ref.connDetails || [],
+    ocmId:       tags['ref:ocm'] || ref.ocmId,
+  };
+}
+
+// ─── RENDER HELPERS ──────────────────────────────────────────────────────────
+function makeMarkerIcon(s) {
+  const hasLive   = s.liveTotal > 0;
+  const label     = hasLive
+    ? `<span style="font-size:10px;font-weight:700;line-height:1">${s.free}/${s.liveTotal}</span>`
+    : '⚡';
+  const watched   = !!watchedStations[s.id];
+  return L.divIcon({
+    className: '',
+    html: `<div class="ev-marker ${s.status}${hasLive ? ' live' : ''}${watched ? ' watching' : ''}" data-id="${s.id}">${label}</div>`,
+    iconSize: [28, 28], iconAnchor: [14, 14],
+  });
+}
+
+function buildConnHTML(s) {
+  if (s.connDetails && s.connDetails.length > 0) {
+    return `<div class="conn-detail">` + s.connDetails.map(c => {
+      const kwLabel = c.powerKW ? `${c.powerKW >= 1000 ? (c.powerKW/1000).toFixed(0)+'MW' : c.powerKW+' kW'}` : '';
+      const avCls   = c.free > 0 ? 'free' : c.total > 0 ? 'busy' : 'unknown';
+      const avLabel = c.total > 0 ? `${c.free}/${c.total} vrij` : '?';
+      return `<div class="conn-row">
+        <span class="conn-type">${esc(c.type)}</span>
+        ${kwLabel ? `<span class="conn-kw">${kwLabel}</span>` : ''}
+        <span class="conn-avail ${avCls}">${c.free > 0 ? '✅' : c.total > 0 ? '🔴' : '❓'} ${avLabel}</span>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+  const statusBadge = s.status === 'available'
+    ? '<span class="badge badge-green">● Vrij</span>'
+    : s.status === 'busy' ? '<span class="badge badge-red">● Bezet</span>' : '';
+  return `<div class="station-badges">
+    ${s.connTypes.map(connBadge).join('')}
+    ${s.maxKw > 0 ? `<span class="badge badge-blue">${s.maxKw} kW</span>` : ''}
+    ${s.totalSockets > 0 ? `<span class="badge badge-grey">${s.totalSockets} plugs</span>` : ''}
+    ${statusBadge}
+    ${s.fee === 'no' ? '<span class="badge badge-green">Gratis</span>' : ''}
+  </div>`;
+}
+
+function buildCardInner(s) {
+  const watched  = !!watchedStations[s.id];
+  const dist     = userPos ? distanceMeter(userPos.lat, userPos.lng, s.lat, s.lng) : null;
+  const distStr  = dist !== null ? formatDist(dist) : '';
+  const iconCls  = s.status === 'available' ? 'available' : s.status === 'busy' ? 'busy' : '';
+  const hoursBadge = s.openingHours === '24/7'
+    ? `<span class="badge badge-grey">24/7</span>`
+    : s.openingHours
+      ? `<span class="badge badge-grey" title="${esc(s.openingHours)}">🕐 ${esc(s.openingHours.length > 22 ? s.openingHours.slice(0,22)+'…' : s.openingHours)}</span>`
+      : '';
+  const authBadges  = (s.auth || []).map(a => `<span class="badge badge-teal">${a}</span>`).join('');
+  const extraBadges = hoursBadge + authBadges;
+  return `
+    <div class="station-top">
+      <div class="station-icon ${iconCls}">⚡</div>
+      <div class="station-info">
+        <div class="station-name">${esc(s.name)}</div>
+        <div class="station-addr">${esc(s.addr || s.operator || 'Adres onbekend')}${distStr ? `<span class="station-dist">· ${distStr}</span>` : ''}</div>
+      </div>
+      <a class="btn-nav" href="${navUrl(s.lat, s.lng)}" target="_blank" rel="noopener" title="Navigeer hier naartoe">🗺️</a>
+      <button class="btn-watch${watched ? ' watching' : ''}" data-id="${s.id}" title="${watched ? 'Bewaking stoppen' : 'Meld mij als vrij'}">🔔</button>
+    </div>
+    ${buildConnHTML(s)}
+    ${extraBadges ? `<div class="station-badges" style="margin-top:8px">${extraBadges}</div>` : ''}
+  `;
+}
+
+// Werk één paal bij zodra live data binnenkomt — geen volledige herrender nodig
+function applyLiveUpdate(liveData) {
+  // Zoek dichtstbijzijnde OSM-paal binnen ~120m
+  let best = null, bestD = Infinity;
+  for (const s of Object.values(currentStations)) {
+    const d = Math.hypot(s.lat - liveData.lat, s.lng - liveData.lng);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  if (!best || bestD > 0.0011) return; // ~120m drempel
+
+  // Update station-data in-place
+  best.status      = liveData.status;
+  best.free        = liveData.free;
+  best.busy        = liveData.busy;
+  best.liveTotal   = liveData.total;
+  best.connDetails = liveData.connDetails;
+  currentStations[best.id] = best;
+
+  // Update marker op de kaart
+  if (best._marker) best._marker.setIcon(makeMarkerIcon(best));
+
+  // Update kaartje in het paneel als het zichtbaar is
+  const card = document.querySelector(`.station-card[data-id="${best.id}"]`);
+  if (card) {
+    card.innerHTML = buildCardInner(best);
+    card.querySelector('.btn-watch').addEventListener('click', e => {
+      e.stopPropagation();
+      toggleWatch(best.id, best.name, best.lat, best.lng, best.ocmId);
+    });
+    card.addEventListener('click', () => {
+      map.setView([best.lat, best.lng], Math.max(map.getZoom(), 16), { animate: true });
+    });
+  }
+
+  // Statusbalk bijwerken
+  const vals = Object.values(currentStations);
+  const fr = vals.filter(s => s.status === 'available').length;
+  const bu = vals.filter(s => s.status === 'busy').length;
+  const un = vals.filter(s => s.status === 'unknown').length;
+  if (fr > 0 || bu > 0) {
+    document.getElementById('sb-free').innerHTML    = fr ? `<span style="color:var(--green)">● ${fr} vrij</span>` : '';
+    document.getElementById('sb-busy').innerHTML    = bu ? `<span style="color:var(--red)">● ${bu} bezet</span>` : '';
+    document.getElementById('sb-unknown').innerHTML = un ? `<span style="color:var(--muted)">● ${un} onbekend</span>` : '';
+    document.getElementById('status-bar').style.display = 'flex';
+  }
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function renderStations(elements, ocmIndex = []) {
+  clusterGroup.clearLayers();
+  currentStations = {};
+  // yield zodat de browser de kaart kan hertekenen na clearLayers
+  return new Promise(resolve => requestAnimationFrame(() => { _doRender(elements, ocmIndex); resolve(); }));
+}
+function _doRender(elements, ocmIndex) {
+
+  const allStations = elements.map(el => parseStation(el, ocmIndex)).filter(Boolean);
+  const stations = kwFilter
+    ? allStations.filter(s => {
+        if (s.maxKw <= 0) return false; // kW onbekend: verbergen bij actief filter
+        return s.maxKw >= kwFilter[0] && s.maxKw < kwFilter[1];
+      })
+    : allStations;
   const list = document.getElementById('station-list');
   list.innerHTML = '';
 
   if (!stations.length) {
     list.innerHTML = `<div class="empty"><div class="empty-icon">🔌</div><div class="empty-text">Geen laadpalen gevonden in dit gebied.<br>Zoom uit of beweeg de kaart.</div></div>`;
+    document.getElementById('loading').style.display = 'none';
     return;
   }
 
   stations.forEach(s => {
-    const id       = String(s.ID);
-    const name     = s.AddressInfo?.Title || 'Laadpaal';
-    const addr     = [s.AddressInfo?.AddressLine1, s.AddressInfo?.Town].filter(Boolean).join(', ');
-    const lat      = s.AddressInfo?.Latitude;
-    const lng      = s.AddressInfo?.Longitude;
-    const status   = getStatus(s);
-    const watched  = !!watchedStations[id];
-    const conns    = s.Connections || [];
-    const maxKw    = Math.max(0, ...conns.map(c => c.PowerKW || 0));
+    currentStations[s.id] = s;
 
-    // MAP MARKER
-    if (!currentMarkers[id]) {
-      const icon = L.divIcon({
-        className: '',
-        html: `<div class="ev-marker ${status} ${watched ? 'watching' : ''}" data-id="${id}">⚡</div>`,
-        iconSize: [32,32], iconAnchor: [16,16],
-      });
-      const marker = L.marker([lat, lng], { icon })
-        .addTo(map)
-        .on('click', () => selectStation(id, stations));
-      currentMarkers[id] = marker;
-    }
+    // Marker opslaan zodat applyLiveUpdate hem later kan bijwerken
+    const marker = L.marker([s.lat, s.lng], { icon: makeMarkerIcon(s) })
+      .on('click', () => { selectStation(s.id); openPanel(); });
+    clusterGroup.addLayer(marker);
+    s._marker = marker;
 
-    // LIST CARD
+    // List card
     const card = document.createElement('div');
-    card.className = `station-card ${watched ? 'watched' : ''}`;
-    card.dataset.id = id;
-    card.innerHTML = `
-      <div class="station-top">
-        <div class="station-icon ${status}">${status === 'available' ? '✅' : status === 'busy' ? '🔴' : '❓'}</div>
-        <div class="station-info">
-          <div class="station-name">${name}</div>
-          <div class="station-addr">${addr || 'Adres onbekend'}</div>
-        </div>
-      </div>
-      <div class="station-badges">
-        <span class="badge ${status === 'available' ? 'badge-green' : status === 'busy' ? 'badge-red' : 'badge-grey'}">
-          ${status === 'available' ? 'Vrij' : status === 'busy' ? 'Bezet' : 'Onbekend'}
-        </span>
-        ${maxKw > 0 ? `<span class="badge badge-blue">${maxKw} kW</span>` : ''}
-        ${conns.length ? `<span class="badge badge-grey">${conns.length} aansluiting${conns.length > 1 ? 'en' : ''}</span>` : ''}
-      </div>
-      <button class="btn-watch ${watched ? 'watching' : ''}" data-id="${id}" data-name="${name}">
-        ${watched ? '🔔 Bewaking stoppen' : '🔔 Meld mij als vrij'}
-      </button>
-    `;
+    card.className = `station-card${watchedStations[s.id] ? ' watched' : ''}`;
+    card.dataset.id = s.id;
+    card.innerHTML = buildCardInner(s);
+
     card.querySelector('.btn-watch').addEventListener('click', e => {
       e.stopPropagation();
-      toggleWatch(id, name, status);
+      toggleWatch(s.id, s.name, s.lat, s.lng, s.ocmId);
     });
     card.addEventListener('click', () => {
-      if (lat && lng) map.setView([lat, lng], 15, { animate: true });
+      map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate: true });
     });
     list.appendChild(card);
   });
 
-  openPanel();
-}
+  const free    = stations.filter(s => s.status === 'available').length;
+  const busy    = stations.filter(s => s.status === 'busy').length;
+  const unknown = stations.filter(s => s.status === 'unknown').length;
 
-// ─── STATUS ─────────────────────────────────────────────────────────────────
-function getStatus(s) {
-  const statusId = s.StatusType?.ID;
-  if (statusId === 50)  return 'available';
-  if (statusId === 210) return 'busy';
-  if (statusId === 100) return 'available';
-  // Check connections
-  const conns = s.Connections || [];
-  if (conns.some(c => c.StatusType?.ID === 50))  return 'available';
-  if (conns.some(c => c.StatusType?.ID === 210)) return 'busy';
-  return 'unknown';
-}
+  const countLabel = stations.length >= MAX_RESULTS
+    ? `${MAX_RESULTS}+ laadpalen`
+    : `${stations.length} laadpalen`;
+  document.getElementById('panel-label').textContent = countLabel;
+  document.getElementById('legend').style.display = stations.length ? 'block' : 'none';
 
-// ─── SELECT STATION ─────────────────────────────────────────────────────────
-function selectStation(id, stations) {
-  document.querySelectorAll('.station-card').forEach(c => c.classList.remove('selected'));
-  const card = document.querySelector(`.station-card[data-id="${id}"]`);
-  if (card) {
-    card.classList.add('selected');
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // Statusbalk
+  const bar = document.getElementById('status-bar');
+  if (free > 0 || busy > 0) {
+    document.getElementById('sb-free').innerHTML    = free > 0  ? `<span style="color:var(--green)">● ${free} vrij</span>`    : '';
+    document.getElementById('sb-busy').innerHTML    = busy > 0  ? `<span style="color:var(--red)">● ${busy} bezet</span>`    : '';
+    document.getElementById('sb-unknown').innerHTML = unknown > 0 ? `<span style="color:var(--muted)">● ${unknown} onbekend</span>` : '';
+    bar.style.display = 'flex';
+  } else {
+    bar.style.display = 'none';
   }
   openPanel();
+  document.getElementById('loading').style.display = 'none';
+
+  // Auto-watch nearest station when navigated via coordinate share
+  if (pendingAutoWatch && stations.length) {
+    const target  = pendingAutoWatch;
+    pendingAutoWatch = null;
+    const nearest = stations.reduce((best, s) => {
+      const d = Math.hypot(s.lat - target.lat, s.lng - target.lng);
+      return !best || d < best.d ? { s, d } : best;
+    }, null)?.s;
+    if (nearest) {
+      selectStation(nearest.id);
+      showToast('📍', 'Paal gevonden', `"${nearest.name}" is de dichtstbijzijnde paal. Tik "Meld mij als vrij" om te bewaken.`);
+    }
+  }
+}
+
+const CONN_TYPE_LABELS = {
+  'IEC62196Type2Outlet':       'Type 2',
+  'IEC62196Type2CableAttached':'Type 2',
+  'IEC62196Type2CCS':          'CCS',
+  'IEC62196Type1CCSCombo':     'CCS',
+  'Chademo':                   'CHAdeMO',
+  'Tesla':                     'Tesla SC',
+  'IEC62196Type1Outlet':       'Type 1',
+  'Schuko':                    'Schuko',
+};
+function ttConnLabel(type) { return CONN_TYPE_LABELS[type] || type; }
+
+const CONN_COLORS = {
+  'Type 2':   'badge-blue',
+  'CCS':      'badge-green',
+  'CHAdeMO':  'badge-orange',
+  'Tesla SC': 'badge-red',
+  'Schuko':   'badge-grey',
+  'NEMA':     'badge-grey',
+};
+function connBadge(t) {
+  return `<span class="badge ${CONN_COLORS[t] || 'badge-grey'}">${t}</span>`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── SELECT ─────────────────────────────────────────────────────────────────
+function selectStation(id) {
+  document.querySelectorAll('.station-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.station-card[data-id="${id}"]`);
+  if (card) { card.classList.add('selected'); card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 
 // ─── WATCH / UNWATCH ────────────────────────────────────────────────────────
-async function toggleWatch(id, name, currentStatus) {
-  if (watchedStations[id]) {
-    unwatchStation(id);
-    return;
-  }
+async function toggleWatch(id, name, lat, lng, ocmId) {
+  if (watchedStations[id]) { unwatchStation(id); return; }
 
-  // Request notification permission
   if ('Notification' in window && Notification.permission === 'default') {
-    const perm = await Notification.requestPermission();
-    notifPermission = perm;
+    await Notification.requestPermission();
   }
-
   if (Notification?.permission !== 'granted') {
     showToast('⚠️', 'Meldingen uitgeschakeld', 'Zet meldingen aan in je instellingen om een signaal te ontvangen.');
     showInstallBanner();
     return;
   }
 
-  watchedStations[id] = { name, lastStatus: currentStatus, checkCount: 0 };
-  startPolling(id, name);
+  watchedStations[id] = { name, lastStatus: 'unknown', checkCount: 0, lat, lng, ocmId };
+  startPolling(id);
   renderWatchList();
   showToast('🔔', 'Bewaking gestart', `Je krijgt een melding zodra "${name}" vrijkomt.`);
   updateNotifCount();
-
-  // Re-render card
-  document.querySelectorAll(`.station-card[data-id="${id}"] .btn-watch`).forEach(btn => {
-    btn.textContent = '🔔 Bewaking stoppen';
-    btn.classList.add('watching');
-  });
-  document.querySelectorAll(`.station-card[data-id="${id}"]`).forEach(c => c.classList.add('watched'));
+  setWatchedUI(id, true);
 }
 
 function unwatchStation(id) {
@@ -529,63 +1113,104 @@ function unwatchStation(id) {
   delete watchedStations[id];
   renderWatchList();
   updateNotifCount();
-  document.querySelectorAll(`.station-card[data-id="${id}"] .btn-watch`).forEach(btn => {
-    btn.textContent = '🔔 Meld mij als vrij';
-    btn.classList.remove('watching');
-  });
-  document.querySelectorAll(`.station-card[data-id="${id}"]`).forEach(c => c.classList.remove('watched'));
+  setWatchedUI(id, false);
   showToast('🔕', 'Bewaking gestopt', 'Je ontvangt geen meldingen meer voor deze paal.');
 }
 
-// ─── POLLING ────────────────────────────────────────────────────────────────
-function startPolling(id, name) {
-  // Poll immediately, then on interval
-  pollStation(id, name);
-  pollTimers[id] = setInterval(() => pollStation(id, name), POLL_INTERVAL);
+function setWatchedUI(id, on) {
+  document.querySelectorAll(`.station-card[data-id="${id}"] .btn-watch`).forEach(btn => {
+    btn.textContent = '🔔';
+    btn.title = on ? 'Bewaking stoppen' : 'Meld mij als vrij';
+    btn.classList.toggle('watching', on);
+  });
+  document.querySelectorAll(`.station-card[data-id="${id}"]`).forEach(c => c.classList.toggle('watched', on));
 }
 
-async function pollStation(id, name) {
-  if (!watchedStations[id]) return;
+// ─── POLLING via OCM (coordinate proximity) ──────────────────────────────────
+function startPolling(id) {
+  pollStation(id);
+  pollTimers[id] = setInterval(() => pollStation(id), POLL_INTERVAL);
+}
+
+async function pollStation(id) {
+  const s = watchedStations[id];
+  if (!s) return;
   try {
-    const url = `https://api.openchargemap.io/v3/poi/?output=json&chargepointid=${id}&compact=true&verbose=false`
-              + (OCM_KEY !== 'YOUR_OCM_KEY' ? `&key=${OCM_KEY}` : '');
-    const res  = await fetch(url);
-    const data = await res.json();
-    if (!data.length) return;
+    const result = TOMTOM_KEY !== 'YOUR_TOMTOM_KEY'
+      ? await pollTomTom(s)
+      : await pollOCM(s);
 
-    const newStatus = getStatus(data[0]);
-    const prev      = watchedStations[id]?.lastStatus;
+    const newStatus = result?.status ?? result ?? 'unknown';
+    const free      = result?.free  ?? null;
+    const total     = result?.total ?? null;
 
-    watchedStations[id].checkCount++;
-    updateWatchItemStatus(id, newStatus);
-
-    if (prev !== 'available' && newStatus === 'available') {
-      // 🎉 VRIJ!
-      notifyAvailable(id, name);
-    }
-    watchedStations[id].lastStatus = newStatus;
-
+    s.checkCount++;
+    if (s.lastStatus !== 'available' && newStatus === 'available') notifyAvailable(id, s.name, free, total);
+    s.lastStatus = newStatus;
+    updateWatchItemStatus(id, newStatus, free, total);
   } catch(e) {
-    console.warn('Poll error voor', id, e);
+    console.warn('Poll error', id, e);
   }
 }
 
-function notifyAvailable(id, name) {
-  // In-app toast
-  showToast('✅', 'Laadpaal vrij!', `"${name}" is nu beschikbaar!`);
+async function pollTomTom(s) {
+  // Stap 1: zoek het station op via coördinaten
+  const searchUrl = `https://api.tomtom.com/search/2/nearbySearch/.json`
+                  + `?key=${TOMTOM_KEY}&lat=${s.lat}&lon=${s.lng}`
+                  + `&radius=80&categorySet=7309&limit=1&view=Unified`;
+  const searchRes = await fetchWithTimeout(searchUrl, {}, 8000);
+  if (!searchRes.ok) throw new Error(`TomTom HTTP ${searchRes.status}`);
+  const r = (await searchRes.json()).results?.[0];
+  if (!r) return 'no-data';
 
-  // System notification
+  const avId = r.dataSources?.chargingAvailability?.id;
+  if (!avId) return 'unknown';
+
+  const avUrl = `https://api.tomtom.com/search/2/chargingAvailability.json`
+              + `?key=${TOMTOM_KEY}&chargingAvailability=${avId}`;
+  const avRes = await fetchWithTimeout(avUrl, {}, 8000);
+  if (!avRes.ok) return 'unknown';
+  const conns = (await avRes.json()).connectors || [];
+  const free  = conns.reduce((s, c) => s + (c.availability?.current?.available || 0), 0);
+  const busy  = conns.reduce((s, c) => s + (c.availability?.current?.occupied  || 0), 0);
+  const total = conns.reduce((s, c) => s + (c.total || 0), 0);
+  return { status: free > 0 ? 'available' : busy > 0 ? 'busy' : 'unknown', free, total };
+}
+
+async function pollOCM(s) {
+  const base = `https://api.openchargemap.io/v3/poi/?output=json&compact=true&verbose=false`;
+  const key  = OCM_KEY !== 'YOUR_OCM_KEY' ? `&key=${OCM_KEY}` : '';
+  const url  = s.ocmId
+    ? `${base}&chargepointid=${s.ocmId}${key}`
+    : `${base}&latitude=${s.lat}&longitude=${s.lng}&distance=0.05&distanceunit=km&maxresults=1${key}`;
+  const res  = await fetch(url);
+  const data = await res.json();
+  if (!data.length) return 'no-data';
+  return getOCMStatus(data[0]);
+}
+
+function getOCMStatus(s) {
+  const sid = s.StatusType?.ID;
+  if (sid === 50 || sid === 100) return 'available';
+  if (sid === 210)               return 'busy';
+  const conns = s.Connections || [];
+  if (conns.some(c => c.StatusType?.ID === 50))  return 'available';
+  if (conns.some(c => c.StatusType?.ID === 210)) return 'busy';
+  return 'unknown';
+}
+
+function notifyAvailable(id, name, free = null, total = null) {
+  const detail = free && total ? ` (${free}/${total} aansluitingen vrij)` : '';
+  showToast('✅', 'Laadpaal vrij!', `"${name}" is nu beschikbaar${detail}!`);
   if (Notification?.permission === 'granted') {
     new Notification('⚡ Laadpaal vrij!', {
-      body: `${name} is nu beschikbaar om te laden.`,
-      icon: 'icon-192.png',
-      badge: 'icon-192.png',
-      tag: `ev-${id}`,
+      body:     `${name} is nu beschikbaar om te laden.`,
+      icon:     'icon-192.png',
+      badge:    'icon-192.png',
+      tag:      `ev-${id}`,
       renotify: true,
     });
   }
-
-  // Stop watching after notification
   setTimeout(() => unwatchStation(id), 5000);
 }
 
@@ -594,31 +1219,30 @@ function renderWatchList() {
   const section = document.getElementById('watching-section');
   const list    = document.getElementById('watching-list');
   const entries = Object.entries(watchedStations);
-
-  if (!entries.length) {
-    section.style.display = 'none';
-    return;
-  }
+  if (!entries.length) { section.style.display = 'none'; return; }
   section.style.display = 'block';
   list.innerHTML = entries.map(([id, s]) => `
     <div class="watch-item" id="watch-item-${id}">
       <div class="watch-pulse"></div>
       <div style="flex:1">
-        <div class="watch-name">${s.name}</div>
-        <div class="watch-status" id="watch-status-${id}">Controleren… (${s.checkCount || 0}x)</div>
+        <div class="watch-name">${esc(s.name)}</div>
+        <div class="watch-status" id="watch-status-${id}">Controleren…</div>
       </div>
       <button class="btn-unwatch" onclick="unwatchStation('${id}')">×</button>
     </div>
   `).join('');
 }
 
-function updateWatchItemStatus(id, status) {
+function updateWatchItemStatus(id, status, free = null, total = null) {
   const el = document.getElementById(`watch-status-${id}`);
-  if (el && watchedStations[id]) {
-    const s = watchedStations[id];
-    const statusText = status === 'available' ? '✅ Vrij!' : status === 'busy' ? '🔴 Bezet' : '❓ Onbekend';
-    el.textContent = `${statusText} · ${s.checkCount}x gecontroleerd`;
-  }
+  const s  = watchedStations[id];
+  if (!el || !s) return;
+  let label;
+  if (status === 'available') label = total ? `✅ ${free}/${total} vrij` : '✅ Vrij';
+  else if (status === 'busy') label = total ? `🔴 0/${total} vrij` : '🔴 Bezet';
+  else if (status === 'no-data') label = '⚠️ Geen live data';
+  else label = '❓ Onbekend';
+  el.textContent = `${label} · ${s.checkCount}x gecontroleerd`;
 }
 
 function updateNotifCount() {
@@ -628,30 +1252,93 @@ function updateNotifCount() {
   el.style.display = count > 0 ? 'block' : 'none';
 }
 
+// ─── COORDINATE HELPERS ─────────────────────────────────────────────────────
+// Extract lat/lng from raw text, coordinates, or map sharing URLs
+function extractCoords(text) {
+  if (!text) return null;
+  text = text.trim();
+  let m;
+
+  // Google Maps share URL: maps.google.com/?q=51.05,4.37 or ...@51.05,4.37,...
+  m = text.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  m = text.match(/[?&]q=(-?\d+\.\d+)[,+](-?\d+\.\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  // Apple Maps: maps.apple.com/?ll=51.05,4.37
+  m = text.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  // geo: URI (used by Android)
+  m = text.match(/^geo:(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  // Raw decimal coordinates: "51.0546, 4.3789" or "51.0546 4.3789"
+  m = text.match(/^(-?\d{1,3}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})$/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  return null;
+}
+
+// ─── URL PARAMETER SUPPORT ──────────────────────────────────────────────────
+// Supports ?lat=X&lng=Y&watch=1&name=StationName
+// Also handles Web Share Target: ?url=...&text=...
+function handleUrlParams() {
+  const p    = new URLSearchParams(window.location.search);
+  const lat  = parseFloat(p.get('lat'));
+  const lng  = parseFloat(p.get('lng'));
+  const name = p.get('name') || null;
+
+  if (!isNaN(lat) && !isNaN(lng)) {
+    if (p.get('watch') === '1') pendingAutoWatch = { lat, lng, name };
+    // Boot will setView, moveend → scheduleLoad → renderStations → picks up pendingAutoWatch
+    map.setView([lat, lng], 15);
+    return;
+  }
+
+  // Web Share Target: shared URL or text may contain coordinates
+  const shared = p.get('url') || p.get('text');
+  const coords = extractCoords(shared);
+  if (coords) {
+    pendingAutoWatch = { lat: coords.lat, lng: coords.lng, name };
+    map.setView([coords.lat, coords.lng], 15);
+  }
+}
+
 // ─── SEARCH ─────────────────────────────────────────────────────────────────
 let searchTimer;
 document.getElementById('search').addEventListener('input', e => {
   clearTimeout(searchTimer);
   const q = e.target.value.trim();
   if (q.length < 3) return;
+
+  // Detect coordinates / map links before geocoding
+  const coords = extractCoords(q);
+  if (coords) {
+    document.getElementById('search').value = '';
+    pendingAutoWatch = { lat: coords.lat, lng: coords.lng, name: null };
+    map.setView([coords.lat, coords.lng], 15, { animate: true });
+    showToast('📍', 'Locatie gevonden', 'Laadpalen in de buurt worden geladen…');
+    return;
+  }
+
   searchTimer = setTimeout(() => geocodeAndLoad(q), 500);
 });
+
+// Show the coordinate tip the first time the search gets focus
+document.getElementById('search').addEventListener('focus', () => {
+  document.getElementById('share-hint').style.display = 'block';
+}, { once: true });
 
 async function geocodeAndLoad(q) {
   try {
     const res  = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
     const data = await res.json();
     if (data.length) {
-      const { lat, lon } = data[0];
-      map.setView([lat, lon], 13, { animate: true });
-      loadStations({ lat: parseFloat(lat), lng: parseFloat(lon) });
+      map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 13, { animate: true });
     }
   } catch(e) { console.warn('Geocode error', e); }
-}
-
-// ─── MAP CLICK ──────────────────────────────────────────────────────────────
-function onMapClick(e) {
-  loadStations(e.latlng);
 }
 
 // ─── PANEL ──────────────────────────────────────────────────────────────────
@@ -659,13 +1346,102 @@ function openPanel() {
   if (window.innerWidth < 600) {
     panelOpen = true;
     document.getElementById('panel').classList.add('open');
-    document.getElementById('panel-label').textContent = 'Laadpalen';
   }
 }
+
+// ─── DICHTSTBIJZIJNDE ZOEKEN ─────────────────────────────────────────────────
+const nearestFilters = { status: '', minKw: 0, connType: '' };
+
+document.getElementById('nearest-toggle').addEventListener('click', () => {
+  const body  = document.getElementById('nearest-body');
+  const arrow = document.getElementById('nearest-arrow');
+  const open  = body.style.display === 'none';
+  body.style.display  = open ? 'block' : 'none';
+  arrow.textContent   = open ? '▲' : '▼';
+});
+
+document.getElementById('nearest-section').addEventListener('click', e => {
+  const chip = e.target.closest('.nf-chip');
+  if (!chip) return;
+  const key = chip.dataset.key;
+  // deactiveer andere chips in zelfde groep
+  chip.closest('.filter-chips').querySelectorAll('.nf-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  nearestFilters[key] = key === 'minKw' ? parseFloat(chip.dataset.val) : chip.dataset.val;
+});
+
+function applyNearestSearch(origin) {
+  const candidates = Object.values(currentStations).filter(s => {
+    if (nearestFilters.status && s.status !== nearestFilters.status) return false;
+    if (nearestFilters.minKw > 0) {
+      const maxKw = s.connDetails.length
+        ? Math.max(...s.connDetails.map(c => c.powerKW || 0))
+        : s.maxKw;
+      if (maxKw < nearestFilters.minKw) return false;
+    }
+    if (nearestFilters.connType) {
+      const inOSM = s.connTypes.includes(nearestFilters.connType);
+      const inTT  = s.connDetails.some(c => c.type === nearestFilters.connType);
+      if (!inOSM && !inTT) return false;
+    }
+    return true;
+  });
+
+  if (!candidates.length) {
+    showToast('🔍', 'Niet gevonden', 'Geen laadpalen gevonden met deze criteria. Pas de filters aan of zoom in op een ander gebied.');
+    return;
+  }
+
+  const best = candidates.reduce((b, s) => {
+    const d = distanceMeter(origin.lat, origin.lng, s.lat, s.lng);
+    return !b || d < b.d ? { s, d } : b;
+  }, null);
+
+  map.setView([best.s.lat, best.s.lng], Math.max(map.getZoom(), 16), { animate: true });
+  selectStation(best.s.id);
+  openPanel();
+  showToast('📍', 'Dichtstbijzijnde gevonden', `${best.s.name} — ${formatDist(best.d)}`);
+}
+
+document.getElementById('btn-find-nearest').addEventListener('click', async () => {
+  const origin = userPos
+    ? userPos
+    : { lat: map.getCenter().lat, lng: map.getCenter().lng };
+
+  // Altijd een verse query rond de gebruikerspositie — ongeacht wat er al geladen is
+  document.getElementById('loading').style.display = 'block';
+  try {
+    const r = 15000; // 15 km radius
+    const q = `[out:json][timeout:25];(node["amenity"="charging_station"](around:${r},${origin.lat},${origin.lng});way["amenity"="charging_station"](around:${r},${origin.lat},${origin.lng}););out center tags 300;`;
+    const result = await overpassFetch(q);
+    lastOSMElements = result.elements || [];
+    lastLoadedBounds = null; // kaart mag daarna opnieuw laden als nodig
+    renderStations(lastOSMElements, []);
+    document.getElementById('loading').style.display = 'none';
+
+    if (TOMTOM_KEY !== 'YOUR_TOMTOM_KEY') fetchTomTomIndex(map.getBounds());
+
+    applyNearestSearch(origin);
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    showToast('⚠️', 'Fout', 'Kon geen palen ophalen. Controleer uw verbinding.');
+  }
+});
 
 document.getElementById('panel-toggle').addEventListener('click', () => {
   panelOpen = !panelOpen;
   document.getElementById('panel').classList.toggle('open', panelOpen);
+});
+
+document.getElementById('kw-filter').addEventListener('click', e => {
+  const chip = e.target.closest('.kw-chip');
+  if (!chip) return;
+  document.querySelectorAll('.kw-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  const min = parseFloat(chip.dataset.min);
+  const max = parseFloat(chip.dataset.max);
+  kwFilter = (min === 0 && max === 9999) ? null : [min, max];
+  renderStations(lastOSMElements, lastStatusIndex);
 });
 
 // ─── TOAST ──────────────────────────────────────────────────────────────────
@@ -673,7 +1449,7 @@ let toastTimer;
 function showToast(icon, title, body) {
   document.querySelector('.toast-icon').textContent = icon;
   document.getElementById('toast-title').textContent = title;
-  document.getElementById('toast-body').textContent = body;
+  document.getElementById('toast-body').textContent  = body;
   const t = document.getElementById('toast');
   t.classList.add('show');
   clearTimeout(toastTimer);
@@ -682,8 +1458,7 @@ function showToast(icon, title, body) {
 
 // ─── INSTALL BANNER ─────────────────────────────────────────────────────────
 function showInstallBanner() {
-  const banner = document.getElementById('install-banner');
-  banner.classList.add('show');
+  document.getElementById('install-banner').classList.add('show');
 }
 
 window.addEventListener('beforeinstallprompt', e => {
@@ -695,10 +1470,9 @@ window.addEventListener('beforeinstallprompt', e => {
 document.getElementById('btn-install').addEventListener('click', async () => {
   if (deferredInstall) {
     deferredInstall.prompt();
-    const { outcome } = await deferredInstall.userChoice;
+    await deferredInstall.userChoice;
     deferredInstall = null;
   } else {
-    // iOS instruction
     showToast('📲', 'Voeg toe aan beginscherm', 'Tik op het Deel-icoon (□↑) en kies "Zet op beginscherm"');
   }
   document.getElementById('install-banner').classList.remove('show');
@@ -708,12 +1482,8 @@ document.getElementById('btn-dismiss').addEventListener('click', () => {
   document.getElementById('install-banner').classList.remove('show');
 });
 
-// Detect iOS for manual install instructions
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isStandalone = window.navigator.standalone;
-if (isIOS && !isStandalone) {
-  setTimeout(showInstallBanner, 4000);
-}
+if (isIOS && !window.navigator.standalone) setTimeout(showInstallBanner, 4000);
 
 // ─── SERVICE WORKER ─────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -722,6 +1492,8 @@ if ('serviceWorker' in navigator) {
 
 // ─── BOOT ───────────────────────────────────────────────────────────────────
 initMap();
+// Handle URL params after map is ready (geolocation may override, that's fine)
+setTimeout(handleUrlParams, 100);
 </script>
 </body>
 </html>
