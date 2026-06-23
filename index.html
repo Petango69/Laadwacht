@@ -627,7 +627,7 @@ const OVERPASS_MIRRORS = [
 
 // ─── INDEXED DB CACHE ────────────────────────────────────────────────────────
 const IDB_NAME  = 'laadwacht-v1';
-const OSM_TTL   = 12 * 3600 * 1000; // 12 uur — palen verhuizen zelden
+const OSM_TTL   = 3 * 24 * 3600 * 1000; // 3 dagen — palen verhuizen zelden
 const TT_TTL    =      10 * 60 * 1000; // 10 minuten — live status
 let   idb       = null;
 
