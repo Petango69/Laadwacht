@@ -1145,14 +1145,28 @@ function applyLiveUpdate(liveData) {
 
 // ─── RENDER ──────────────────────────────────────────────────────────────────
 function renderStations(elements, ocmIndex = []) {
+  const prevStations = { ...currentStations }; // bewaar TomTom-data vóór wissen
   clusterGroup.clearLayers();
   currentStations = {};
   // yield zodat de browser de kaart kan hertekenen na clearLayers
-  return new Promise(resolve => requestAnimationFrame(() => { _doRender(elements, ocmIndex); resolve(); }));
+  return new Promise(resolve => requestAnimationFrame(() => { _doRender(elements, ocmIndex, prevStations); resolve(); }));
 }
-function _doRender(elements, ocmIndex) {
+function _doRender(elements, ocmIndex, prevStations = {}) {
 
-  const allStations = elements.map(el => parseStation(el, ocmIndex)).filter(Boolean);
+  const allStations = elements.map(el => {
+    const s = parseStation(el, ocmIndex);
+    if (!s) return null;
+    // Herstel TomTom-verrijking die via applyLiveUpdate binnenkwam
+    const prev = prevStations[s.id];
+    if (prev?.connDetails?.length) {
+      s.connDetails = prev.connDetails;
+      s.status      = prev.status;
+      s.free        = prev.free;
+      s.busy        = prev.busy;
+      s.liveTotal   = prev.liveTotal;
+    }
+    return s;
+  }).filter(Boolean);
   const stations = kwFilter
     ? allStations.filter(s => {
         const kw = s.connDetails?.length
