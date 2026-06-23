@@ -625,6 +625,102 @@ const OVERPASS_MIRRORS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
 
+// ─── INDEXED DB CACHE ────────────────────────────────────────────────────────
+const IDB_NAME  = 'laadwacht-v1';
+const OSM_TTL   = 12 * 3600 * 1000; // 12 uur — palen verhuizen zelden
+const TT_TTL    =      10 * 60 * 1000; // 10 minuten — live status
+let   idb       = null;
+
+async function getDB() {
+  if (idb) return idb;
+  return new Promise((resolve) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('osm')) d.createObjectStore('osm', { keyPath: 'key' });
+      if (!d.objectStoreNames.contains('tt'))  d.createObjectStore('tt',  { keyPath: 'id'  });
+    };
+    req.onsuccess = e => { idb = e.target.result; resolve(idb); };
+    req.onerror   = ()  => resolve(null); // graceful degradation
+  });
+}
+
+// Cache-sleutel: afgerond op 0.25° zodat nabijgelegen viewports dezelfde entry delen
+function osmCacheKey(bounds) {
+  const c   = bounds.getCenter();
+  const lat = (Math.floor(c.lat * 4) / 4).toFixed(2);
+  const lng = (Math.floor(c.lng * 4) / 4).toFixed(2);
+  return `${lat},${lng}`;
+}
+
+async function saveOSMCache(bounds, elements) {
+  const db = await getDB();
+  if (!db || !elements.length) return;
+  const tx = db.transaction('osm', 'readwrite');
+  tx.objectStore('osm').put({ key: osmCacheKey(bounds), elements, ts: Date.now() });
+}
+
+async function loadOSMCache(bounds) {
+  const db = await getDB();
+  if (!db) return null;
+  return new Promise(resolve => {
+    const req = db.transaction('osm').objectStore('osm').get(osmCacheKey(bounds));
+    req.onsuccess = e => {
+      const r = e.target.result;
+      resolve(r && (Date.now() - r.ts) < OSM_TTL ? r.elements : null);
+    };
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function saveTTCache(stations) {
+  const db = await getDB();
+  if (!db) return;
+  const tx = db.transaction('tt', 'readwrite');
+  const st = tx.objectStore('tt');
+  for (const s of stations) {
+    if (s.connDetails?.length || s.liveTotal > 0) {
+      st.put({ id: s.id, connDetails: s.connDetails, status: s.status,
+               free: s.free, busy: s.busy, liveTotal: s.liveTotal, ts: Date.now() });
+    }
+  }
+}
+
+async function loadTTCache(ids) {
+  const db = await getDB();
+  if (!db || !ids.length) return {};
+  return new Promise(resolve => {
+    const result = {};
+    const tx  = db.transaction('tt');
+    const st  = tx.objectStore('tt');
+    let pending = ids.length;
+    const done = () => { if (!--pending) resolve(result); };
+    for (const id of ids) {
+      const req = st.get(id);
+      req.onsuccess = e => {
+        const r = e.target.result;
+        if (r && (Date.now() - r.ts) < TT_TTL) result[r.id] = r;
+        done();
+      };
+      req.onerror = done;
+    }
+  });
+}
+
+async function applyTTCache() {
+  const ttData = await loadTTCache(Object.keys(currentStations));
+  for (const [id, tt] of Object.entries(ttData)) {
+    const s = currentStations[id];
+    if (!s) continue;
+    s.connDetails = tt.connDetails;
+    s.status      = tt.status;
+    s.free        = tt.free;
+    s.busy        = tt.busy;
+    s.liveTotal   = tt.liveTotal;
+    if (s._marker) s._marker.setIcon(makeMarkerIcon(s));
+  }
+}
+
 // ─── STATE ──────────────────────────────────────────────────────────────────
 let map, clusterGroup;
 let currentStations  = {};
@@ -801,14 +897,26 @@ async function loadStations() {
   document.getElementById('loading').style.display = 'block';
   try {
     const b    = map.getBounds();
+
+    // Fase 0: Toon gecachde palen direct (stale-while-revalidate)
+    const cached = await loadOSMCache(b);
+    if (cached?.length) {
+      lastOSMElements = cached;
+      await renderStations(cached, []);
+      applyTTCache(); // merge gecachde TomTom live-data (fire-and-forget)
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    // Fase 1: OSM ophalen op de achtergrond (of voorgrond als geen cache)
     const bbox = `${b.getSouth().toFixed(5)},${b.getWest().toFixed(5)},${b.getNorth().toFixed(5)},${b.getEast().toFixed(5)}`;
     const q    = `[out:json][timeout:25][bbox:${bbox}];(node["amenity"="charging_station"];way["amenity"="charging_station"];);out center tags ${MAX_RESULTS};`;
 
-    // Fase 1: OSM laadpalen tonen zodra data binnen is
+    if (!cached?.length) document.getElementById('loading').style.display = 'block';
     const osmResult = await overpassFetch(q);
     lastLoadedBounds = b.pad(0.5);
     lastOSMElements  = osmResult.elements || [];
-    renderStations(lastOSMElements, []);
+    saveOSMCache(b, lastOSMElements); // fire-and-forget
+    await renderStations(lastOSMElements, []);
     document.getElementById('loading').style.display = 'none';
 
     // Fase 2: TomTom update elke paal individueel zodra zijn data binnenkomt
@@ -882,6 +990,7 @@ async function fetchTomTomIndex(bounds) {
     );
 
     setSvcStatus('tt', liveCount > 0 ? 'ok' : 'error');
+    if (liveCount > 0) saveTTCache(Object.values(currentStations)); // fire-and-forget
     return []; // applyLiveUpdate heeft al alles bijgewerkt
   } catch(e) {
     console.warn('TomTom fetch mislukt:', e.message);
