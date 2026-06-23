@@ -79,32 +79,125 @@
       z-index: 1;
     }
 
-    /* BOTTOM PANEL */
-    #panel {
+    /* FLOATING kW FILTER */
+    #float-filter {
+      position: fixed;
+      top: calc(60px + env(safe-area-inset-top, 0px) + 8px);
+      left: 0; right: 0;
+      z-index: 400;
+      display: flex; gap: 6px;
+      padding: 0 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #float-filter::-webkit-scrollbar { display: none; }
+
+    /* FLOATING LEGEND */
+    #float-legend {
+      position: fixed;
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      left: 12px;
+      z-index: 400;
+    }
+    #legend-toggle {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(15,25,35,0.85);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #legend-content {
+      margin-bottom: 8px;
+      background: rgba(15,25,35,0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 10px; color: var(--muted); line-height: 1.9;
+      max-width: 260px;
+    }
+
+    /* STATUS BAR — floating pill */
+    #status-bar {
+      position: fixed;
+      bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+      left: 50%; transform: translateX(-50%);
+      z-index: 400;
+      background: rgba(15,25,35,0.82);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 14px;
+      white-space: nowrap;
+      display: none;
+      gap: 16px;
+      font-size: 13px; font-weight: 600;
+    }
+
+    /* STATION SHEET */
+    #station-sheet {
       position: fixed; bottom: 0; left: 0; right: 0;
-      z-index: 500;
+      z-index: 600;
+      background: var(--surface);
+      border-radius: var(--radius) var(--radius) 0 0;
+      border-top: 1px solid var(--border);
+      padding: 0 16px calc(20px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+      max-height: 75vh; overflow-y: auto;
+    }
+    #station-sheet.open { transform: translateY(0); }
+    #sheet-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--border);
+      margin: 12px auto 10px; cursor: pointer;
+    }
+
+    /* SHEET BACKDROP */
+    #sheet-backdrop {
+      position: fixed; inset: 0; z-index: 590;
+      display: none; background: rgba(0,0,0,0.15);
+    }
+    #sheet-backdrop.visible { display: block; }
+
+    /* MENU PANEL */
+    #menu-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      z-index: 700;
       background: var(--surface);
       border-top: 1px solid var(--border);
       border-radius: var(--radius) var(--radius) 0 0;
       padding: 0 16px calc(32px + env(safe-area-inset-bottom, 0px));
-      transform: translateY(calc(100% - 64px));
+      transform: translateY(100%);
       transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
-      max-height: 80vh;
-      overflow-y: auto;
+      max-height: 80vh; overflow-y: auto;
     }
-    #panel.open { transform: translateY(0); }
-
-    .panel-handle {
-      display: flex; align-items: center; justify-content: center;
-      padding: 12px 0 8px; cursor: pointer; gap: 8px;
+    #menu-panel.open { transform: translateY(0); }
+    #menu-handle {
+      display: flex; align-items: center;
+      padding: 12px 0 8px; gap: 8px;
     }
     .handle-bar {
       width: 36px; height: 4px;
       background: var(--border); border-radius: 2px;
+      flex-shrink: 0;
     }
-    .panel-title {
-      font-size: 13px; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.8px;
+
+    /* HEADER MENU BUTTON */
+    #btn-menu {
+      background: none; border: none; color: var(--text);
+      font-size: 20px; cursor: pointer;
+      padding: 4px 6px; line-height: 1;
+    }
+    #btn-menu-close {
+      background: none; border: none; color: var(--muted);
+      font-size: 16px; cursor: pointer; margin-left: auto;
     }
 
     /* SEARCH */
@@ -119,16 +212,12 @@
     #search::placeholder { color: var(--muted); }
     .search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; }
 
-    /* STATION LIST */
-    #kw-filter {
-      display: flex; gap: 6px; flex-wrap: wrap;
-      padding: 0 0 12px;
-    }
     .kw-chip {
       font-size: 12px; font-weight: 600;
       padding: 5px 11px; border-radius: 20px;
       border: 1px solid var(--border);
-      background: var(--bg); color: var(--muted);
+      background: rgba(15,25,35,0.82); color: var(--muted);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
       white-space: nowrap;
     }
@@ -168,8 +257,6 @@
       color: var(--bg); font-size: 13px; font-weight: 700; cursor: pointer;
     }
     #btn-find-nearest:active { opacity: 0.8; }
-
-    #station-list { display: flex; flex-direction: column; gap: 10px; }
 
     .station-card {
       background: var(--bg); border: 1px solid var(--border);
@@ -324,14 +411,19 @@
 
     /* EV MARKERS */
     .ev-marker {
-      width: 28px; height: 28px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
       font-size: 13px; border: 2px solid rgba(255,255,255,0.25);
       cursor: pointer; background: rgba(107,122,149,0.85);
     }
-    .ev-marker.available { background: rgba(34,197,94,0.92); }
-    .ev-marker.busy      { background: rgba(239,68,68,0.92); }
-    .ev-marker.unknown   { background: rgba(107,122,149,0.85); }
+    /* Beschikbaarheid via randkleur */
+    .ev-marker.available { border: 3px solid rgba(34,197,94,0.95); }
+    .ev-marker.busy      { border: 3px solid rgba(239,68,68,0.95); }
+    .ev-marker.unknown   { border: 2px solid rgba(255,255,255,0.25); }
+    /* Snelheidskleur altijd als vulkleur */
+    .ev-marker.spd-ac    { background: rgba(74,144,217,0.9); }
+    .ev-marker.spd-fast  { background: rgba(255,107,53,0.9); }
+    .ev-marker.spd-ultra { background: rgba(155,89,182,0.9); }
     .ev-marker.live      { animation: livering 2.5s ease-out infinite; }
     .ev-marker.available.live { --ring: rgba(34,197,94,0.6); }
     .ev-marker.busy.live      { --ring: rgba(239,68,68,0.6); }
@@ -372,11 +464,10 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (min-width: 600px) {
-      #panel { max-width: 400px; right: auto; border-radius: 0; border-right: 1px solid var(--border); top: calc(60px + env(safe-area-inset-top, 0px)); bottom: 0; transform: none; max-height: none; overflow-y: auto; padding-bottom: 32px; }
-      #panel.open { transform: none; }
-      .panel-handle { display: none; }
-      #map { left: 400px; top: calc(60px + env(safe-area-inset-top, 0px)); bottom: 0; }
-      #install-banner { bottom: 16px; left: 416px; }
+      #menu-panel { max-width: 400px; right: auto; border-radius: 0; border-right: 1px solid var(--border); top: calc(60px + env(safe-area-inset-top, 0px)); bottom: 0; transform: translateY(100%); max-height: none; overflow-y: auto; padding-bottom: 32px; }
+      #menu-panel.open { transform: none; }
+      #menu-handle .handle-bar { display: none; }
+      #install-banner { bottom: 16px; }
     }
   </style>
 </head>
@@ -389,6 +480,7 @@
     <div class="svc" title="OpenStreetMap / Overpass"><div id="dot-osm" class="svc-dot"></div><span>OSM</span></div>
     <div class="svc" title="TomTom live status"><div id="dot-tt" class="svc-dot"></div><span>TomTom</span></div>
   </div>
+  <button id="btn-menu">☰</button>
   <span id="notif-count">0</span>
 </header>
 
@@ -396,16 +488,61 @@
 
 <div id="map"></div>
 
-<div id="panel">
-  <div class="panel-handle" id="panel-toggle">
-    <div class="handle-bar"></div>
-    <span class="panel-title" id="panel-label">Laadpalen</span>
-  </div>
+<!-- Always-visible floating kW filter -->
+<div id="float-filter">
+  <span class="kw-chip active" data-min="0"   data-max="9999">Alles</span>
+  <span class="kw-chip"        data-min="0"   data-max="22">≤ 22 kW (AC)</span>
+  <span class="kw-chip"        data-min="22"  data-max="99">22–99 kW</span>
+  <span class="kw-chip"        data-min="100" data-max="9999">≥ 100 kW</span>
+</div>
 
-  <div id="status-bar" style="display:none; justify-content:center; gap:16px; padding:8px 0 12px; font-size:13px; font-weight:600;">
-    <span id="sb-free"></span>
-    <span id="sb-busy"></span>
-    <span id="sb-unknown"></span>
+<!-- Always-visible floating legend (bottom-left) -->
+<div id="float-legend" style="display:none">
+  <div id="legend-content" style="display:none">
+    <div style="font-weight:700; color:var(--text); margin-bottom:6px">Legenda</div>
+    <div style="margin-bottom:4px"><strong style="color:var(--text)">Kleur</strong> = laadsnelheid</div>
+    <div>
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(74,144,217,0.9);vertical-align:middle;margin-right:5px"></span>AC ≤ 22 kW
+      &nbsp;·&nbsp;
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(255,107,53,0.9);vertical-align:middle;margin-right:5px"></span>DC 22–99 kW
+      &nbsp;·&nbsp;
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(155,89,182,0.9);vertical-align:middle;margin-right:5px"></span>HPC ≥ 100 kW
+      &nbsp;·&nbsp;
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(107,122,149,0.85);vertical-align:middle;margin-right:5px;line-height:12px;text-align:center;font-size:9px;font-weight:700;color:#fff">?</span>Snelheid onbekend
+    </div>
+    <div style="margin-top:6px;margin-bottom:4px"><strong style="color:var(--text)">Rand</strong> = beschikbaarheid (live)</div>
+    <div>
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(74,144,217,0.5);border:3px solid rgba(34,197,94,0.95);vertical-align:middle;margin-right:5px"></span>Vrij
+      &nbsp;·&nbsp;
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(255,107,53,0.5);border:3px solid rgba(239,68,68,0.95);vertical-align:middle;margin-right:5px"></span>Bezet
+    </div>
+    <div style="margin-top:4px">Pulserende ring = live data · <strong>1/2</strong> = vrij/totaal connectors</div>
+  </div>
+  <button id="legend-toggle">i</button>
+</div>
+
+<!-- Status counter — floating pill above sheet -->
+<div id="status-bar">
+  <span id="sb-free"></span>
+  <span id="sb-busy"></span>
+  <span id="sb-unknown"></span>
+</div>
+
+<!-- Single-station bottom sheet -->
+<div id="station-sheet">
+  <div id="sheet-handle"></div>
+  <div id="sheet-body"></div>
+</div>
+
+<!-- Sheet backdrop -->
+<div id="sheet-backdrop"></div>
+
+<!-- Menu panel (search + nearest + watching) -->
+<div id="menu-panel">
+  <div id="menu-handle">
+    <div class="handle-bar"></div>
+    <span style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px">Menu</span>
+    <button id="btn-menu-close">✕</button>
   </div>
 
   <div class="search-wrap">
@@ -414,13 +551,6 @@
   </div>
   <div id="share-hint" style="font-size:11px;color:var(--muted);margin:-8px 0 14px;line-height:1.5;display:none">
     💡 Tip: plak coördinaten (<code style="color:var(--accent)">51.05, 4.37</code>) of een Google/Apple Maps link om direct naar een paal te springen.
-  </div>
-
-  <div id="kw-filter">
-    <span class="kw-chip active" data-min="0"   data-max="9999">Alles</span>
-    <span class="kw-chip"        data-min="0"   data-max="22">≤ 22 kW (AC)</span>
-    <span class="kw-chip"        data-min="22"  data-max="99">22–99 kW</span>
-    <span class="kw-chip"        data-min="100" data-max="9999">≥ 100 kW</span>
   </div>
 
   <div id="nearest-section">
@@ -455,19 +585,6 @@
       </div>
       <button id="btn-find-nearest">🎯 Zoek dichtstbijzijnde</button>
     </div>
-  </div>
-
-  <div id="station-list">
-    <div class="empty">
-      <div class="empty-icon">🗺️</div>
-      <div class="empty-text">Zoom in op een stad om<br>laadpalen te zien</div>
-    </div>
-  </div>
-
-  <div id="legend" style="display:none; margin-top:16px; padding:10px 12px; background:var(--bg); border-radius:var(--radius); border:1px solid var(--border); font-size:11px; color:var(--muted); line-height:1.8">
-    <div style="font-weight:700; color:var(--text); margin-bottom:4px">Legenda</div>
-    <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(34,197,94,0.9);vertical-align:middle;margin-right:6px"></span>Vrij · <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(239,68,68,0.9);vertical-align:middle;margin-right:6px"></span>Bezet · <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:rgba(107,122,149,0.85);vertical-align:middle;margin-right:6px"></span>Onbekend</div>
-    <div style="margin-top:4px">Pulserende ring = live data beschikbaar · <strong>1/2</strong> = vrij/totaal</div>
   </div>
 
   <div id="watching-section" style="display:none">
@@ -513,7 +630,7 @@ let map, clusterGroup;
 let currentStations  = {};
 let watchedStations  = {};
 let pollTimers       = {};
-let panelOpen        = false;
+let menuOpen         = false;
 let loadTimer        = null;
 let deferredInstall  = null;
 let pendingAutoWatch = null;
@@ -522,6 +639,44 @@ let lastZoom         = null;
 let lastOSMElements  = []; // cache voor achtergrond status-update
 let lastStatusIndex  = []; // cache voor kW-filter herrender
 let userPos          = null; // { lat, lng } — bijgehouden via watchPosition
+
+// ─── REVERSE GEOCODING ───────────────────────────────────────────────────────
+const rgCache = {};         // key "lat,lng" → adresstring
+const rgQueue = [];
+let   rgBusy  = false;
+
+async function processRgQueue() {
+  if (rgBusy || !rgQueue.length) return;
+  rgBusy = true;
+  const { lat, lng, cb } = rgQueue.shift();
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  try {
+    const res  = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { headers: { 'Accept-Language': 'nl', 'User-Agent': 'LaadWacht/1.0' } }, 6000
+    );
+    const d    = await res.json();
+    const a    = d.address || {};
+    const addr = [a.road, a.house_number, a.city || a.town || a.village || a.municipality]
+      .filter(Boolean).join(' ');
+    rgCache[key] = addr || null;
+    cb(addr || null);
+  } catch {
+    rgCache[key] = null;
+    cb(null);
+  }
+  await new Promise(r => setTimeout(r, 1100)); // Nominatim: max 1 req/s
+  rgBusy = false;
+  processRgQueue();
+}
+
+function reverseGeocode(lat, lng, cb) {
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (key in rgCache) { cb(rgCache[key]); return; }
+  rgQueue.push({ lat, lng, cb });
+  processRgQueue();
+}
+
 let kwFilter         = null; // null=alles | [min,max] kW range
 
 // ─── LOCATIE & AFSTAND ───────────────────────────────────────────────────────
@@ -609,11 +764,6 @@ function scheduleLoad() {
   if (map.getZoom() < MIN_ZOOM) {
     lastLoadedBounds = null;
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('station-list').innerHTML = `
-      <div class="empty">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-text">Zoom in op een stad (niveau ${MIN_ZOOM}+)<br>om laadpalen te zien.</div>
-      </div>`;
     return;
   }
   // Niet herladen als het zichtbare gebied (+ 10% marge) al geladen is
@@ -852,16 +1002,44 @@ function parseStation(el, ocmIndex = []) {
 }
 
 // ─── RENDER HELPERS ──────────────────────────────────────────────────────────
+function spdClass(kw) {
+  if (kw >= 100) return 'spd-ultra';
+  if (kw >= 22)  return 'spd-fast';
+  if (kw >= 1)   return 'spd-ac';
+  return '';
+}
+
 function makeMarkerIcon(s) {
-  const hasLive   = s.liveTotal > 0;
-  const label     = hasLive
-    ? `<span style="font-size:10px;font-weight:700;line-height:1">${s.free}/${s.liveTotal}</span>`
-    : '⚡';
-  const watched   = !!watchedStations[s.id];
+  const hasLive = s.liveTotal > 0;
+  const watched = !!watchedStations[s.id];
+
+  // Beste kW-waarde: TomTom connDetails > OSM maxKw
+  const kw = s.connDetails?.length
+    ? Math.max(...s.connDetails.map(c => c.powerKW || 0))
+    : (s.maxKw || 0);
+  const kwLabel = kw >= 1
+    ? (kw >= 1000 ? `${Math.round(kw / 1000)}MW` : `${kw}kW`)
+    : '';
+
+  // Snelheidskleur altijd tonen — beschikbaarheid via randkleur
+  const speedCls = spdClass(kw);
+
+  let html;
+  if (hasLive && kwLabel) {
+    html = `<span style="font-size:10px;font-weight:700;line-height:1">${s.free}/${s.liveTotal}</span>`
+         + `<span style="font-size:8px;font-weight:600;opacity:0.9">${kwLabel}</span>`;
+  } else if (hasLive) {
+    html = `<span style="font-size:10px;font-weight:700;line-height:1">${s.free}/${s.liveTotal}</span>`;
+  } else if (kwLabel) {
+    html = `<span style="font-size:9px;font-weight:700;line-height:1">${kwLabel}</span>`;
+  } else {
+    html = `<span style="font-size:11px;font-weight:700;opacity:0.7">?</span>`;
+  }
+
   return L.divIcon({
     className: '',
-    html: `<div class="ev-marker ${s.status}${hasLive ? ' live' : ''}${watched ? ' watching' : ''}" data-id="${s.id}">${label}</div>`,
-    iconSize: [28, 28], iconAnchor: [14, 14],
+    html: `<div class="ev-marker ${s.status}${hasLive ? ' live' : ''}${speedCls ? ' ' + speedCls : ''}${watched ? ' watching' : ''}" data-id="${s.id}">${html}</div>`,
+    iconSize: [34, 34], iconAnchor: [17, 17],
   });
 }
 
@@ -907,7 +1085,7 @@ function buildCardInner(s) {
       <div class="station-icon ${iconCls}">⚡</div>
       <div class="station-info">
         <div class="station-name">${esc(s.name)}</div>
-        <div class="station-addr">${esc(s.addr || s.operator || 'Adres onbekend')}${distStr ? `<span class="station-dist">· ${distStr}</span>` : ''}</div>
+        <div class="station-addr">${esc(s.addr || s.operator || `${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}`)}${distStr ? `<span class="station-dist">· ${distStr}</span>` : ''}</div>
       </div>
       <a class="btn-nav" href="${navUrl(s.lat, s.lng)}" target="_blank" rel="noopener" title="Navigeer hier naartoe">🗺️</a>
       <button class="btn-watch${watched ? ' watching' : ''}" data-id="${s.id}" title="${watched ? 'Bewaking stoppen' : 'Meld mij als vrij'}">🔔</button>
@@ -938,17 +1116,18 @@ function applyLiveUpdate(liveData) {
   // Update marker op de kaart
   if (best._marker) best._marker.setIcon(makeMarkerIcon(best));
 
-  // Update kaartje in het paneel als het zichtbaar is
-  const card = document.querySelector(`.station-card[data-id="${best.id}"]`);
-  if (card) {
-    card.innerHTML = buildCardInner(best);
-    card.querySelector('.btn-watch').addEventListener('click', e => {
-      e.stopPropagation();
-      toggleWatch(best.id, best.name, best.lat, best.lng, best.ocmId);
-    });
-    card.addEventListener('click', () => {
-      map.setView([best.lat, best.lng], Math.max(map.getZoom(), 16), { animate: true });
-    });
+  // Update station sheet als die open staat voor dit station
+  const sheetBody = document.getElementById('sheet-body');
+  if (sheetBody && document.getElementById('station-sheet').classList.contains('open')) {
+    const watchBtn = sheetBody.querySelector('.btn-watch');
+    if (watchBtn && watchBtn.dataset.id === best.id) {
+      sheetBody.innerHTML = buildCardInner(best);
+      sheetBody.querySelector('.btn-watch')?.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleWatch(best.id, best.name, best.lat, best.lng, best.ocmId);
+      });
+      sheetBody.querySelector('.btn-nav')?.addEventListener('click', e => e.stopPropagation());
+    }
   }
 
   // Statusbalk bijwerken
@@ -976,15 +1155,16 @@ function _doRender(elements, ocmIndex) {
   const allStations = elements.map(el => parseStation(el, ocmIndex)).filter(Boolean);
   const stations = kwFilter
     ? allStations.filter(s => {
-        if (s.maxKw <= 0) return false; // kW onbekend: verbergen bij actief filter
-        return s.maxKw >= kwFilter[0] && s.maxKw < kwFilter[1];
+        const kw = s.connDetails?.length
+          ? Math.max(...s.connDetails.map(c => c.powerKW || 0))
+          : s.maxKw;
+        if (kw <= 0) return false;
+        return kw >= kwFilter[0] && kw < kwFilter[1];
       })
     : allStations;
-  const list = document.getElementById('station-list');
-  list.innerHTML = '';
 
   if (!stations.length) {
-    list.innerHTML = `<div class="empty"><div class="empty-icon">🔌</div><div class="empty-text">Geen laadpalen gevonden in dit gebied.<br>Zoom uit of beweeg de kaart.</div></div>`;
+    document.getElementById('float-legend').style.display = 'none';
     document.getElementById('loading').style.display = 'none';
     return;
   }
@@ -994,35 +1174,16 @@ function _doRender(elements, ocmIndex) {
 
     // Marker opslaan zodat applyLiveUpdate hem later kan bijwerken
     const marker = L.marker([s.lat, s.lng], { icon: makeMarkerIcon(s) })
-      .on('click', () => { selectStation(s.id); openPanel(); });
+      .on('click', () => { openStationSheet(s.id); });
     clusterGroup.addLayer(marker);
     s._marker = marker;
-
-    // List card
-    const card = document.createElement('div');
-    card.className = `station-card${watchedStations[s.id] ? ' watched' : ''}`;
-    card.dataset.id = s.id;
-    card.innerHTML = buildCardInner(s);
-
-    card.querySelector('.btn-watch').addEventListener('click', e => {
-      e.stopPropagation();
-      toggleWatch(s.id, s.name, s.lat, s.lng, s.ocmId);
-    });
-    card.addEventListener('click', () => {
-      map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate: true });
-    });
-    list.appendChild(card);
   });
 
   const free    = stations.filter(s => s.status === 'available').length;
   const busy    = stations.filter(s => s.status === 'busy').length;
   const unknown = stations.filter(s => s.status === 'unknown').length;
 
-  const countLabel = stations.length >= MAX_RESULTS
-    ? `${MAX_RESULTS}+ laadpalen`
-    : `${stations.length} laadpalen`;
-  document.getElementById('panel-label').textContent = countLabel;
-  document.getElementById('legend').style.display = stations.length ? 'block' : 'none';
+  document.getElementById('float-legend').style.display = stations.length ? '' : 'none';
 
   // Statusbalk
   const bar = document.getElementById('status-bar');
@@ -1034,7 +1195,6 @@ function _doRender(elements, ocmIndex) {
   } else {
     bar.style.display = 'none';
   }
-  openPanel();
   document.getElementById('loading').style.display = 'none';
 
   // Auto-watch nearest station when navigated via coordinate share
@@ -1046,7 +1206,7 @@ function _doRender(elements, ocmIndex) {
       return !best || d < best.d ? { s, d } : best;
     }, null)?.s;
     if (nearest) {
-      selectStation(nearest.id);
+      openStationSheet(nearest.id);
       showToast('📍', 'Paal gevonden', `"${nearest.name}" is de dichtstbijzijnde paal. Tik "Meld mij als vrij" om te bewaken.`);
     }
   }
@@ -1082,9 +1242,37 @@ function esc(s) {
 
 // ─── SELECT ─────────────────────────────────────────────────────────────────
 function selectStation(id) {
-  document.querySelectorAll('.station-card').forEach(c => c.classList.remove('selected'));
-  const card = document.querySelector(`.station-card[data-id="${id}"]`);
-  if (card) { card.classList.add('selected'); card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  // No-op: marker click now opens the station sheet directly
+}
+
+// ─── STATION SHEET ──────────────────────────────────────────────────────────
+function openStationSheet(id) {
+  const s = currentStations[id];
+  if (!s) return;
+  const sheet = document.getElementById('station-sheet');
+  const body  = document.getElementById('sheet-body');
+  body.innerHTML = buildCardInner(s);
+  body.querySelector('.btn-watch')?.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleWatch(s.id, s.name, s.lat, s.lng, s.ocmId);
+  });
+  body.querySelector('.btn-nav')?.addEventListener('click', e => e.stopPropagation());
+  sheet.classList.add('open');
+  document.getElementById('sheet-backdrop').classList.add('visible');
+  // Reverse geocode als er nog geen adres is
+  if (!s.addr && !s.operator) {
+    reverseGeocode(s.lat, s.lng, addr => {
+      if (!addr) return;
+      s.addr = addr;
+      const el = body.querySelector('.station-addr');
+      if (el) { const d = el.querySelector('.station-dist'); el.textContent = addr; if (d) el.appendChild(d); }
+    });
+  }
+}
+
+function closeStationSheet() {
+  document.getElementById('station-sheet').classList.remove('open');
+  document.getElementById('sheet-backdrop').classList.remove('visible');
 }
 
 // ─── WATCH / UNWATCH ────────────────────────────────────────────────────────
@@ -1100,10 +1288,20 @@ async function toggleWatch(id, name, lat, lng, ocmId) {
     return;
   }
 
-  watchedStations[id] = { name, lastStatus: 'unknown', checkCount: 0, lat, lng, ocmId };
+  // Huidige staat opslaan als baseline — melden bij verbetering t.o.v. dit moment
+  const cur = currentStations[id];
+  watchedStations[id] = {
+    name, lat, lng, ocmId,
+    lastStatus: cur?.status ?? 'unknown',
+    lastFree:   cur?.free   ?? 0,
+    checkCount: 0,
+  };
   startPolling(id);
   renderWatchList();
-  showToast('🔔', 'Bewaking gestart', `Je krijgt een melding zodra "${name}" vrijkomt.`);
+  const baseMsg = cur?.liveTotal > 0
+    ? `Je krijgt een melding als er meer dan ${cur.free}/${cur.liveTotal} vrij wordt.`
+    : `Je krijgt een melding zodra "${name}" vrijkomt.`;
+  showToast('🔔', 'Bewaking gestart', baseMsg);
   updateNotifCount();
   setWatchedUI(id, true);
 }
@@ -1119,12 +1317,19 @@ function unwatchStation(id) {
 }
 
 function setWatchedUI(id, on) {
-  document.querySelectorAll(`.station-card[data-id="${id}"] .btn-watch`).forEach(btn => {
-    btn.textContent = '🔔';
-    btn.title = on ? 'Bewaking stoppen' : 'Meld mij als vrij';
-    btn.classList.toggle('watching', on);
-  });
-  document.querySelectorAll(`.station-card[data-id="${id}"]`).forEach(c => c.classList.toggle('watched', on));
+  // Update sheet btn-watch if open for this station
+  const sheetBody = document.getElementById('sheet-body');
+  if (sheetBody) {
+    const watchBtn = sheetBody.querySelector('.btn-watch');
+    if (watchBtn && watchBtn.dataset.id === id) {
+      watchBtn.textContent = '🔔';
+      watchBtn.title = on ? 'Bewaking stoppen' : 'Meld mij als vrij';
+      watchBtn.classList.toggle('watching', on);
+    }
+  }
+  // Also update marker watched state
+  const s = currentStations[id];
+  if (s?._marker) s._marker.setIcon(makeMarkerIcon(s));
 }
 
 // ─── POLLING via OCM (coordinate proximity) ──────────────────────────────────
@@ -1146,8 +1351,15 @@ async function pollStation(id) {
     const total     = result?.total ?? null;
 
     s.checkCount++;
-    if (s.lastStatus !== 'available' && newStatus === 'available') notifyAvailable(id, s.name, free, total);
+    const curFree = free ?? 0;
+    // Melden bij elke verbetering: meer connectors vrij dan bij de start van de bewaking
+    const improved = newStatus === 'available' && (
+      s.lastStatus !== 'available' ||          // was bezet, nu vrij
+      (curFree > (s.lastFree ?? 0))            // was 1/2, nu 2/2 (of meer)
+    );
+    if (improved) notifyAvailable(id, s.name, free, total);
     s.lastStatus = newStatus;
+    s.lastFree   = curFree;
     updateWatchItemStatus(id, newStatus, free, total);
   } catch(e) {
     console.warn('Poll error', id, e);
@@ -1201,15 +1413,13 @@ function getOCMStatus(s) {
 }
 
 function notifyAvailable(id, name, free = null, total = null) {
-  const detail = free && total ? ` (${free}/${total} aansluitingen vrij)` : '';
-  showToast('✅', 'Laadpaal vrij!', `"${name}" is nu beschikbaar${detail}!`);
+  const detail  = free != null && total ? `${free}/${total} aansluitingen vrij` : 'vrij';
+  const body    = `${name}: ${detail}`;
+  showToast('✅', 'Laadpaal vrijgekomen!', body);
   if (Notification?.permission === 'granted') {
-    new Notification('⚡ Laadpaal vrij!', {
-      body:     `${name} is nu beschikbaar om te laden.`,
-      icon:     'icon-192.png',
-      badge:    'icon-192.png',
-      tag:      `ev-${id}`,
-      renotify: true,
+    new Notification('⚡ Laadpaal vrijgekomen!', {
+      body, icon: 'icon-192.png', badge: 'icon-192.png',
+      tag: `ev-${id}`, renotify: true,
     });
   }
   setTimeout(() => unwatchStation(id), 5000);
@@ -1342,12 +1552,11 @@ async function geocodeAndLoad(q) {
   } catch(e) { console.warn('Geocode error', e); }
 }
 
-// ─── PANEL ──────────────────────────────────────────────────────────────────
+// ─── MENU PANEL ─────────────────────────────────────────────────────────────
 function openPanel() {
-  if (window.innerWidth < 600) {
-    panelOpen = true;
-    document.getElementById('panel').classList.add('open');
-  }
+  // Backwards-compatibility alias — opens the menu panel
+  menuOpen = true;
+  document.getElementById('menu-panel').classList.add('open');
 }
 
 // ─── DICHTSTBIJZIJNDE ZOEKEN ─────────────────────────────────────────────────
@@ -1399,8 +1608,7 @@ function applyNearestSearch(origin) {
   }, null);
 
   map.setView([best.s.lat, best.s.lng], Math.max(map.getZoom(), 16), { animate: true });
-  selectStation(best.s.id);
-  openPanel();
+  openStationSheet(best.s.id);
   showToast('📍', 'Dichtstbijzijnde gevonden', `${best.s.name} — ${formatDist(best.d)}`);
 }
 
@@ -1429,49 +1637,29 @@ document.getElementById('btn-find-nearest').addEventListener('click', async () =
   }
 });
 
-document.getElementById('panel-toggle').addEventListener('click', () => {
-  panelOpen = !panelOpen;
-  document.getElementById('panel').classList.toggle('open', panelOpen);
+// ─── MENU PANEL EVENTS ───────────────────────────────────────────────────────
+document.getElementById('btn-menu').addEventListener('click', () => {
+  menuOpen = !menuOpen;
+  document.getElementById('menu-panel').classList.toggle('open', menuOpen);
 });
 
-// ─── PANEEL SWIPE GESTURE ────────────────────────────────────────────────────
-(function() {
-  const panel  = document.getElementById('panel');
-  const handle = document.getElementById('panel-toggle');
-  let startY = 0, startOpen = false, dragging = false;
+document.getElementById('btn-menu-close').addEventListener('click', () => {
+  menuOpen = false;
+  document.getElementById('menu-panel').classList.remove('open');
+});
 
-  handle.addEventListener('touchstart', e => {
-    startY    = e.touches[0].clientY;
-    startOpen = panelOpen;
-    dragging  = true;
-    panel.style.transition = 'none';
-  }, { passive: true });
+// ─── STATION SHEET EVENTS ────────────────────────────────────────────────────
+document.getElementById('sheet-backdrop').addEventListener('click', closeStationSheet);
+document.getElementById('sheet-handle').addEventListener('click', closeStationSheet);
 
-  window.addEventListener('touchmove', e => {
-    if (!dragging) return;
-    const dy = e.touches[0].clientY - startY;
-    // Boven open-stand of onder gesloten-stand: niet verder trekken
-    if (startOpen && dy < 0) return;
-    if (!startOpen && dy > 0) return;
-    const maxDrag = panel.offsetHeight - 64;
-    const clamp   = Math.min(Math.max(dy, -maxDrag), maxDrag);
-    const base    = startOpen ? 0 : (panel.offsetHeight - 64);
-    panel.style.transform = `translateY(${base + clamp}px)`;
-  }, { passive: true });
+// ─── LEGEND TOGGLE ───────────────────────────────────────────────────────────
+document.getElementById('legend-toggle').addEventListener('click', () => {
+  const c = document.getElementById('legend-content');
+  c.style.display = c.style.display === 'none' ? 'block' : 'none';
+});
 
-  window.addEventListener('touchend', e => {
-    if (!dragging) return;
-    dragging = false;
-    panel.style.transition = '';
-    const dy = e.changedTouches[0].clientY - startY;
-    // >60px veeg omhoog → open; >60px omlaag → sluiten
-    if (!startOpen && dy < -60) { panelOpen = true;  panel.classList.add('open'); }
-    else if (startOpen && dy > 60) { panelOpen = false; panel.classList.remove('open'); }
-    else { panel.style.transform = ''; } // snap terug
-  });
-})();
-
-document.getElementById('kw-filter').addEventListener('click', e => {
+// ─── kW FILTER (floating) ────────────────────────────────────────────────────
+document.getElementById('float-filter').addEventListener('click', e => {
   const chip = e.target.closest('.kw-chip');
   if (!chip) return;
   document.querySelectorAll('.kw-chip').forEach(c => c.classList.remove('active'));
