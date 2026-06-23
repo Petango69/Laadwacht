@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="LaadWacht" />
@@ -35,12 +35,13 @@
     /* HEADER */
     header {
       position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-      height: 60px;
+      height: calc(60px + env(safe-area-inset-top, 0px));
+      padding-top: env(safe-area-inset-top, 0px);
       background: rgba(15,25,35,0.92);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      display: flex; align-items: center; padding-left: 16px; padding-right: 16px; gap: 12px;
     }
     .logo {
       width: 32px; height: 32px;
@@ -74,7 +75,7 @@
 
     /* MAP */
     #map {
-      position: fixed; top: 60px; left: 0; right: 0; bottom: 0;
+      position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 0; right: 0; bottom: 0;
       z-index: 1;
     }
 
@@ -85,7 +86,7 @@
       background: var(--surface);
       border-top: 1px solid var(--border);
       border-radius: var(--radius) var(--radius) 0 0;
-      padding: 0 16px 32px;
+      padding: 0 16px calc(32px + env(safe-area-inset-bottom, 0px));
       transform: translateY(calc(100% - 64px));
       transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
       max-height: 80vh;
@@ -111,7 +112,7 @@
     #search {
       width: 100%; background: var(--bg); border: 1px solid var(--border);
       border-radius: var(--radius); color: var(--text);
-      padding: 12px 40px 12px 14px; font-size: 15px;
+      padding: 12px 40px 12px 14px; font-size: 16px;
       outline: none; transition: border-color 0.2s;
     }
     #search:focus { border-color: var(--accent); }
@@ -356,7 +357,7 @@
 
     /* Loading overlay */
     #loading {
-      position: fixed; top: 60px; left: 0; right: 0;
+      position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 0; right: 0;
       height: 3px; z-index: 900;
       background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
       background-size: 200% 100%;
@@ -371,10 +372,10 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (min-width: 600px) {
-      #panel { max-width: 400px; right: auto; border-radius: 0; border-right: 1px solid var(--border); top: 60px; bottom: 0; transform: none; max-height: none; overflow-y: auto; }
+      #panel { max-width: 400px; right: auto; border-radius: 0; border-right: 1px solid var(--border); top: calc(60px + env(safe-area-inset-top, 0px)); bottom: 0; transform: none; max-height: none; overflow-y: auto; padding-bottom: 32px; }
       #panel.open { transform: none; }
       .panel-handle { display: none; }
-      #map { left: 400px; top: 60px; bottom: 0; }
+      #map { left: 400px; top: calc(60px + env(safe-area-inset-top, 0px)); bottom: 0; }
       #install-banner { bottom: 16px; left: 416px; }
     }
   </style>
@@ -1432,6 +1433,43 @@ document.getElementById('panel-toggle').addEventListener('click', () => {
   panelOpen = !panelOpen;
   document.getElementById('panel').classList.toggle('open', panelOpen);
 });
+
+// ─── PANEEL SWIPE GESTURE ────────────────────────────────────────────────────
+(function() {
+  const panel  = document.getElementById('panel');
+  const handle = document.getElementById('panel-toggle');
+  let startY = 0, startOpen = false, dragging = false;
+
+  handle.addEventListener('touchstart', e => {
+    startY    = e.touches[0].clientY;
+    startOpen = panelOpen;
+    dragging  = true;
+    panel.style.transition = 'none';
+  }, { passive: true });
+
+  window.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const dy = e.touches[0].clientY - startY;
+    // Boven open-stand of onder gesloten-stand: niet verder trekken
+    if (startOpen && dy < 0) return;
+    if (!startOpen && dy > 0) return;
+    const maxDrag = panel.offsetHeight - 64;
+    const clamp   = Math.min(Math.max(dy, -maxDrag), maxDrag);
+    const base    = startOpen ? 0 : (panel.offsetHeight - 64);
+    panel.style.transform = `translateY(${base + clamp}px)`;
+  }, { passive: true });
+
+  window.addEventListener('touchend', e => {
+    if (!dragging) return;
+    dragging = false;
+    panel.style.transition = '';
+    const dy = e.changedTouches[0].clientY - startY;
+    // >60px veeg omhoog → open; >60px omlaag → sluiten
+    if (!startOpen && dy < -60) { panelOpen = true;  panel.classList.add('open'); }
+    else if (startOpen && dy > 60) { panelOpen = false; panel.classList.remove('open'); }
+    else { panel.style.transform = ''; } // snap terug
+  });
+})();
 
 document.getElementById('kw-filter').addEventListener('click', e => {
   const chip = e.target.closest('.kw-chip');
